@@ -85,6 +85,10 @@ Verified against all 31 operations in the current spec.
    get/update/delete-by-id commands (e.g. `trustattic project accounts <slug>`
    and `trustattic connection check <connection_id> --project <slug>` also take
    their sole path param positionally).
+
+   One exception, keyed purely on parameter *name* (not on any per-resource
+   logic): a flag bound to a path parameter literally named `project_slug` is
+   emitted as **optional** rather than required. See "Current project" below.
 5. Request bodies: one flag per top-level JSON body property, required flags for
    required properties, typed from the schema (string/bool/int/enum). (Every
    request body in the current spec is flat; a nested-object escape hatch is out
@@ -136,7 +140,14 @@ trustattic schedule history <schedule_id> --project <slug>
 trustattic healthcheck
 trustattic permissions
 trustattic external-types
+
+trustattic use <project>   # set the current project (hand-written, not generated)
+trustattic use             # print the current project
+trustattic use --clear     # unset it
 ```
+
+`--project <slug>` above is optional on every command that has it — see "Current
+project" under Auth & config.
 
 ## Charm.land styling
 
@@ -174,6 +185,21 @@ JWT/browser-based and out of scope here).
 - `TRUSTATTIC_TOKEN` env var overrides the config file (for CI).
 - API base URL: `TRUSTATTIC_API_URL` env var; hardcoded default
   `https://api.trustattic.com`.
+
+### Current project
+
+To avoid repeating `--project <slug>` on every project-scoped command:
+
+- `trustattic use <project>` writes `current_project: <slug>` to the same
+  config file. `trustattic use` with no arguments prints the current value;
+  `trustattic use --clear` unsets it.
+- Every generated `--project` flag (i.e. any flag bound to a path parameter
+  named `project_slug`) is optional. A shared `PreRunE`, added once in the
+  hand-written command-building code rather than per command, fills it from
+  `current_project` when the flag wasn't passed, and fails with a clear error
+  ("no project set; pass `--project` or run `trustattic use <project>`") when
+  neither is available.
+- An explicit `--project` flag always overrides the stored current project.
 
 ## Repo layout
 
