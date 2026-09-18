@@ -68,11 +68,59 @@ func IsProjectFlag(p Param) bool {
 	return p.Name == "project_slug"
 }
 
+// ValueKind describes how a flag's raw string/bool/int value must be
+// converted to build the real typed request oapi-codegen generates.
+// Path parameters and body properties are always entered as flat scalars on
+// the CLI, but the real generated client sometimes expects a distinct Go
+// type for a given OpenAPI "format" - a UUID-formatted string becomes
+// uuid.UUID, an email-formatted string becomes openapi_types.Email, and a
+// date-time-formatted string becomes time.Time. ValuePlain covers every
+// other case, where the raw scalar is used (or pointed to) as-is.
+type ValueKind int
+
+const (
+	ValuePlain ValueKind = iota
+	ValueUUID
+	ValueEmail
+	ValueDateTime
+)
+
+// valueKindFor resolves an OpenAPI schema "format" into the ValueKind the
+// real generated client needs. Only string-typed values carry a meaningful
+// non-plain format in the current spec.
+func valueKindFor(format string) ValueKind {
+	switch format {
+	case "uuid":
+		return ValueUUID
+	case "email":
+		return ValueEmail
+	case "date-time":
+		return ValueDateTime
+	default:
+		return ValuePlain
+	}
+}
+
+// isFlatScalar reports whether an OpenAPI schema type can be represented as
+// a single Cobra flag value. Per the design spec's "no nested-object escape
+// hatch" decision, object/array-typed body properties (and properties whose
+// type can't be determined directly, e.g. a oneOf/anyOf union) have no flat
+// CLI representation and are simply not exposed as flags.
+func isFlatScalar(openAPIType string) bool {
+	switch openAPIType {
+	case "object", "array", "":
+		return false
+	default:
+		return true
+	}
+}
+
 // FlagDef is one Cobra flag or positional argument, template-ready.
 type FlagDef struct {
 	Name     string // CLI flag name, kebab-case
 	GoIdent  string // Go variable name
 	Kind     BodyFlagKind
+	Value    ValueKind // how to convert the raw scalar into the real request type
 	Required bool
 	Optional bool // true only for the project flag
 }
@@ -95,7 +143,7 @@ func BuildGeneratedCommands(specs []CommandSpec) []GeneratedCommand {
 
 		if s.Positional != nil {
 			name := FlagName(s.Positional.Name)
-			gc.PositionalFlag = &FlagDef{Name: name, GoIdent: GoIdent(name), Kind: KindString}
+			gc.PositionalFlag = &FlagDef{Name: name, GoIdent: GoIdent(name), Kind: KindString, Value: valueKindFor(s.Positional.Format)}
 		}
 
 		for _, p := range s.Flags {
@@ -104,17 +152,24 @@ func BuildGeneratedCommands(specs []CommandSpec) []GeneratedCommand {
 				Name:     name,
 				GoIdent:  GoIdent(name),
 				Kind:     KindString,
+				Value:    valueKindFor(p.Format),
 				Required: !IsProjectFlag(p),
 				Optional: IsProjectFlag(p),
 			})
 		}
 
 		for _, bp := range s.Operation.BodyProps {
+			if !isFlatScalar(bp.Type) {
+				// No flat CLI representation for an object/array/union body
+				// property - it's simply not exposed as a flag.
+				continue
+			}
 			name := strings.ReplaceAll(bp.Name, "_", "-")
 			gc.BodyFlags = append(gc.BodyFlags, FlagDef{
 				Name:     name,
 				GoIdent:  GoIdent(name),
 				Kind:     FlagKindForType(bp.Type),
+				Value:    valueKindFor(bp.Format),
 				Required: bp.Required,
 			})
 		}

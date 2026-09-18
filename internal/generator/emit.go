@@ -15,13 +15,16 @@ import (
 	"context"
 	"fmt"
 	"os"
-
+{{if .NeedsTime}}	gotime "time"
+{{end}}
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
+{{if .NeedsUUID}}	"github.com/google/uuid"
+{{end}}{{if .NeedsEmail}}	openapi_types "github.com/oapi-codegen/runtime/types"
+{{end}}	"golang.org/x/term"
 
 	"github.com/trustattic/trustattic-cli/internal/cli"
-	"github.com/trustattic/trustattic-cli/internal/client"
-)
+{{if .NeedsClient}}	"github.com/trustattic/trustattic-cli/internal/client"
+{{end}})
 {{.Body}}`
 
 var fileTmpl = template.Must(template.New("file").Parse(fileSkeleton))
@@ -36,16 +39,66 @@ func GroupByTag(cmds []GeneratedCommand) map[string][]GeneratedCommand {
 	return groups
 }
 
+// flagValueKinds returns every distinct ValueKind used by c's path-param
+// flags (including the positional one, if any) and by c's body flags,
+// respectively - used to decide which conversion-only imports a tag file
+// needs.
+func flagValueKinds(c GeneratedCommand) (pathKinds, bodyKinds []ValueKind) {
+	for _, f := range c.Flags {
+		pathKinds = append(pathKinds, f.Value)
+	}
+	if c.PositionalFlag != nil {
+		pathKinds = append(pathKinds, c.PositionalFlag.Value)
+	}
+	for _, f := range c.BodyFlags {
+		bodyKinds = append(bodyKinds, f.Value)
+	}
+	return pathKinds, bodyKinds
+}
+
 // EmitTagFile renders the Go source declaring one New<OperationID>Command
 // function per entry in cmds to w. Every entry is expected to share the
 // same Spec.Tag (call GroupByTag first and emit one file per group).
 func EmitTagFile(w io.Writer, cmds []GeneratedCommand) error {
 	var body strings.Builder
+	var needsUUID, needsEmail, needsTime, needsClient bool
 	for _, c := range cmds {
 		body.WriteString("\n")
 		body.WriteString(renderCommandFunc(c))
+
+		// The client package is only referenced when a command builds a
+		// client.<OperationID>Params or client.<OperationID>JSONRequestBody
+		// value - some real operations (e.g. the "common" healthcheck
+		// endpoint) have neither, so unconditionally importing it would
+		// leave it unused in a tag file made up entirely of such commands.
+		// A body with no flat properties (see below) is passed as a literal
+		// nil, not a client.-qualified struct literal, so it doesn't count.
+		if c.Spec.Operation.HasParams || (c.Spec.Operation.HasBody && len(c.BodyFlags) > 0) {
+			needsClient = true
+		}
+
+		pathKinds, bodyKinds := flagValueKinds(c)
+		for _, v := range pathKinds {
+			if v == ValueUUID {
+				needsUUID = true
+			}
+		}
+		for _, v := range bodyKinds {
+			switch v {
+			case ValueEmail:
+				needsEmail = true
+			case ValueDateTime:
+				needsTime = true
+			}
+		}
 	}
-	return fileTmpl.Execute(w, struct{ Body string }{Body: body.String()})
+	return fileTmpl.Execute(w, struct {
+		Body        string
+		NeedsUUID   bool
+		NeedsEmail  bool
+		NeedsTime   bool
+		NeedsClient bool
+	}{Body: body.String(), NeedsUUID: needsUUID, NeedsEmail: needsEmail, NeedsTime: needsTime, NeedsClient: needsClient})
 }
 
 func renderCommandFunc(c GeneratedCommand) string {
@@ -86,18 +139,44 @@ func renderCommandFunc(c GeneratedCommand) string {
 	// do not reorder this.
 	callArgs := []string{"context.Background()"}
 	for _, f := range c.Flags {
-		callArgs = append(callArgs, f.GoIdent)
+		pre, expr := convertPathParam(f.Value, f.GoIdent, f.GoIdent, "--"+f.Name)
+		b.WriteString(pre)
+		callArgs = append(callArgs, expr)
 	}
 	if c.PositionalFlag != nil {
-		callArgs = append(callArgs, "args[0]")
+		label := fmt.Sprintf("<%s>", c.Spec.Positional.Name)
+		pre, expr := convertPathParam(c.PositionalFlag.Value, c.PositionalFlag.GoIdent, "args[0]", label)
+		b.WriteString(pre)
+		callArgs = append(callArgs, expr)
 	}
-	callArgs = append(callArgs, fmt.Sprintf("&client.%sParams{}", opID))
+	// oapi-codegen only generates a <OperationID>Params argument when the
+	// operation declares at least one parameter (path, header, or query) in
+	// the spec - a handful of real operations (e.g. the "common" healthcheck
+	// endpoint) declare none at all, and WithResponse simply omits the
+	// argument for those.
+	if c.Spec.Operation.HasParams {
+		callArgs = append(callArgs, fmt.Sprintf("&client.%sParams{}", opID))
+	}
 	if c.Spec.Operation.HasBody {
-		var props strings.Builder
-		for _, f := range c.BodyFlags {
-			fmt.Fprintf(&props, "\t\t\t\t%s: &%s,\n", pascalCase(f.GoIdent), f.GoIdent)
+		if len(c.BodyFlags) == 0 {
+			// Every body property this operation declares has no flat CLI
+			// representation (or the body's schema is unconstrained, e.g.
+			// `schema: {}`, which oapi-codegen types as `interface{}`) - a
+			// `client.<OperationID>JSONRequestBody{}` composite literal
+			// isn't valid Go for an interface type, and there's nothing to
+			// populate either way, so pass nil.
+			callArgs = append(callArgs, "nil")
+		} else {
+			var pre strings.Builder
+			var props strings.Builder
+			for _, f := range c.BodyFlags {
+				p, expr := bodyPropExpr(f)
+				pre.WriteString(p)
+				fmt.Fprintf(&props, "\t\t\t\t%s: %s,\n", pascalCase(f.GoIdent), expr)
+			}
+			b.WriteString(pre.String())
+			callArgs = append(callArgs, fmt.Sprintf("client.%sJSONRequestBody{\n%s\t\t\t}", opID, props.String()))
 		}
-		callArgs = append(callArgs, fmt.Sprintf("client.%sJSONRequestBody{\n%s\t\t\t}", opID, props.String()))
 	}
 	fmt.Fprintf(&b, "\t\t\tresp, err := apiClient.%sWithResponse(\n\t\t\t\t%s,\n\t\t\t)\n", opID, strings.Join(callArgs, ",\n\t\t\t\t"))
 
@@ -132,6 +211,85 @@ func renderCommandFunc(c GeneratedCommand) string {
 	}
 	b.WriteString("\treturn cmd\n}\n")
 	return b.String()
+}
+
+// convertPathParam returns the Go expression that should be passed as a
+// path-parameter call argument to <OperationID>WithResponse, plus any Go
+// statements that must run before the call to produce it. rawExpr is how
+// the raw string value is available (a flag variable's Go identifier, or
+// "args[0]" for the trailing positional); varName is a Go-identifier-safe
+// name to derive a local variable from (rawExpr itself isn't always a valid
+// identifier, e.g. "args[0]"); label identifies the parameter in the
+// generated error message (e.g. "--account-id" or "<account_id>").
+//
+// Only ValueUUID needs a conversion here: every path parameter is required
+// by construction (OpenAPI path parameters are always required), so unlike
+// bodyPropExpr there's no optional/pointer case to special-case, and no
+// other ValueKind maps to a distinct Go type for a path parameter in the
+// current spec.
+func convertPathParam(value ValueKind, varName, rawExpr, label string) (pre, expr string) {
+	if value != ValueUUID {
+		return "", rawExpr
+	}
+	parsedVar := varName + "Parsed"
+	pre = fmt.Sprintf(
+		"\t\t\t%s, err := uuid.Parse(%s)\n\t\t\tif err != nil {\n\t\t\t\treturn fmt.Errorf(%q, err)\n\t\t\t}\n",
+		parsedVar, rawExpr, "invalid "+label+": %w",
+	)
+	return pre, parsedVar
+}
+
+// bodyPropExpr returns the Go expression assigned to a JSONRequestBody
+// struct field for body flag f, plus any Go statements that must run before
+// the struct literal to produce it. Whether the real field is a pointer or
+// a plain value follows oapi-codegen's own rule: a required property
+// becomes a plain value, an optional one a pointer - so f.Required (not
+// f.Value) decides pointer-ness, while f.Value decides whether the raw
+// flag's string/bool/int value needs converting to a distinct Go type
+// first (see ValueKind).
+func bodyPropExpr(f FlagDef) (pre, expr string) {
+	switch f.Value {
+	case ValueEmail:
+		conv := fmt.Sprintf("openapi_types.Email(%s)", f.GoIdent)
+		if f.Required {
+			return "", conv
+		}
+		// An unset optional email flag must stay nil rather than becoming a
+		// pointer to an empty openapi_types.Email - unlike a plain optional
+		// string, the real client rejects an empty value against its email
+		// format validation at marshal time.
+		localVar := f.GoIdent + "Email"
+		pre = fmt.Sprintf(
+			"\t\t\tvar %s *openapi_types.Email\n\t\t\tif %s != \"\" {\n\t\t\t\temail := %s\n\t\t\t\t%s = &email\n\t\t\t}\n",
+			localVar, f.GoIdent, conv, localVar,
+		)
+		return pre, localVar
+	case ValueDateTime:
+		// The "time" package is imported as gotime in generated files
+		// specifically so a body property literally named "time" (its
+		// GoIdent, "time", would otherwise shadow the package within this
+		// function - see ScheduleRunPost in the real spec) can't break the
+		// call below.
+		parsedVar := f.GoIdent + "Parsed"
+		errMsg := "invalid --" + f.Name + ": %w"
+		if f.Required {
+			pre = fmt.Sprintf(
+				"\t\t\t%s, err := gotime.Parse(gotime.RFC3339, %s)\n\t\t\tif err != nil {\n\t\t\t\treturn fmt.Errorf(%q, err)\n\t\t\t}\n",
+				parsedVar, f.GoIdent, errMsg,
+			)
+			return pre, parsedVar
+		}
+		pre = fmt.Sprintf(
+			"\t\t\tvar %s *gotime.Time\n\t\t\tif %s != \"\" {\n\t\t\t\tparsed, err := gotime.Parse(gotime.RFC3339, %s)\n\t\t\t\tif err != nil {\n\t\t\t\t\treturn fmt.Errorf(%q, err)\n\t\t\t\t}\n\t\t\t\t%s = &parsed\n\t\t\t}\n",
+			parsedVar, f.GoIdent, f.GoIdent, errMsg, parsedVar,
+		)
+		return pre, parsedVar
+	default: // ValuePlain
+		if f.Required {
+			return "", f.GoIdent
+		}
+		return "", "&" + f.GoIdent
+	}
 }
 
 func goType(k BodyFlagKind) string {

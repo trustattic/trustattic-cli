@@ -5,6 +5,7 @@ update-spec:
 
 generate:
 	cd tools && go generate -tags=tools ./...
+	go run ./cmd/gen
 
 build:
 	go build -o dist/trustattic ./cmd/trustattic
