@@ -65,9 +65,14 @@ Verified against all 32 operations in the current spec.
 2. Split the `operationId` on PascalCase word boundaries and strip:
    - the leading word, if it matches the tag,
    - any word matching an HTTP method (`Get`/`Post`/`Put`/`Delete`/`Patch`),
-   - any word matching a token of a path parameter this operation uses (this is
-     what turns `ProjectSlugGet` into an empty remainder rather than a spurious
-     `slug` subgroup, since `project_slug`'s PascalCase tokens are `Project`/`Slug`).
+   - the non-tag suffix of a path parameter named `<tag>_<suffix>` (this is
+     what turns `ProjectSlugGet` into an empty remainder rather than a
+     spurious `slug` subgroup: `project_slug`'s first PascalCase token,
+     `Project`, matches the `project` tag, so its remaining token `Slug` is
+     stripped). Deliberately narrower than "any word matching any path
+     param's token" — that broader rule would wrongly strip `Restore` from
+     `BackupRestoreGet` on account of the unrelated `restore_id` parameter,
+     breaking its grouping with `BackupRestorePut`.
 3. Group operations sharing the same `(tag, remaining words)`:
    - **Group size 1** → a leaf command named after the remaining words (e.g.
      `AccountPutObtain` → `account obtain`; `ScheduleRunPost` → `schedule run`;
