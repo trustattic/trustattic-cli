@@ -22,12 +22,13 @@ trustattic backup list --project my-project
 trustattic schedule run --schedule-id <id> --project my-project
 ```
 
-Pass `--output json` (or pipe to another program) for raw JSON instead of
-styled tables.
+Pass `--output json` / `-o json` (or pipe to another program) for raw JSON
+instead of styled tables. Any other `--output` value is rejected.
 
 `TRUSTATTIC_API_URL` overrides the API base URL (default
-`https://api.trustattic.com`); `TRUSTATTIC_TOKEN` overrides the stored token,
-for CI.
+`https://api.trustattic.com/api/v2` — note the `/api/v2` path, which the
+generated client does not add for you); `TRUSTATTIC_TOKEN` overrides the
+stored token, for CI.
 
 ## Development
 

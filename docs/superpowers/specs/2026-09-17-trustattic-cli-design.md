@@ -103,6 +103,36 @@ Verified against all 32 operations in the current spec.
    request body in the current spec is flat; a nested-object escape hatch is out
    of scope until the spec needs one.)
 
+### Query parameters: out of scope for v1
+
+**Query parameters get no CLI representation at all in v1.** This design only
+ever addressed path parameters (step 4) and request bodies (step 5); query
+parameters were never covered, and the generator does not expose them. In
+concrete terms that means:
+
+- **Pagination** (`components/parameters/Pagination`: `page`, `per_page`,
+  `order_field`, `order_direction`) is not settable on any of the ten
+  operations that accept it — every generated list command sends
+  `&client.<OperationID>Params{}` with no query values, so the server's
+  defaults apply (today: page 1, 500 per page). A result set larger than one
+  page cannot be reached from the CLI at all.
+- **Filters** are likewise not settable on the four list operations that
+  declare them: `backup list` (`schedule_id`, `resource_id`,
+  `connection_id`, `run_id`, `backup_type`, `status`), `connection resource`
+  (`provider_kind`, `connection_id`, `resource_type`, `region`, `tags`),
+  `connection list` (`provider_kind`, `status`) and `schedule list`
+  (`status`). Each always lists unfiltered.
+
+This is a deliberate, now-explicit scope boundary rather than a silent gap.
+Exposing query parameters means deciding two things this design never
+settled: how a nested object-typed query parameter (which is what
+`Pagination` is) maps onto flat flags — the same open question as the
+nested-body escape hatch above — and how array-typed filters accept repeated
+values. Left to a follow-up.
+
+(Added during implementation, final review: the gap was real and unstated;
+this section states it.)
+
 Residual naming awkwardness — cases where the mechanical rule reads badly — is
 fixed via a small, transparent `operationId → command name` override table
 (`internal/generator/overrides.yaml`), not per-endpoint logic. It's still 1:1
@@ -188,6 +218,19 @@ relative to an earlier reading of the API, not a generator defect —
   non-TTY just errors on the missing required flag.
 - **Errors**: API error bodies rendered in a styled lipgloss error box.
 
+(Revised during implementation, final review: two items above are **not yet
+implemented** and are deferred, not shipped.
+
+- **The in-flight-request `bubbles/spinner` does not exist.** Requests are
+  issued synchronously with no progress indication. Nothing else depends on
+  it and adding it later changes no command's behavior or output.
+- **There are no `huh` prompts for missing required POST/PUT flags.** Cobra's
+  `MarkFlagRequired` errors identically whether or not stdout is a TTY, so the
+  documented "fill it in interactively on a TTY" behavior is really just the
+  documented non-TTY behavior in both cases. `huh` *is* used for `trustattic
+  login`'s token prompt, as described — only the required-flag case is
+  missing.)
+
 ## Output modes
 
 Auto-detected via TTY: styled/interactive by default. Raw JSON (no spinners, no
@@ -210,7 +253,16 @@ JWT/browser-based and out of scope here).
   own user session, then hands the token to whoever runs the CLI.
 - `TRUSTATTIC_TOKEN` env var overrides the config file (for CI).
 - API base URL: `TRUSTATTIC_API_URL` env var; hardcoded default
-  `https://api.trustattic.com`.
+  `https://api.trustattic.com/api/v2`.
+
+(Revised during implementation, final review: the default base URL originally
+read `https://api.trustattic.com`, with no path. The spec declares
+`servers: [{url: /api/v2}]` and platform mounts every route under that
+prefix, but `oapi-codegen`'s generated client does not embed the `servers:`
+block — the caller-supplied base URL has to carry the full prefix itself, so
+the bare host would have 404'd on every endpoint. The integration stack's own
+`PlatformURL` already included `/api/v2`, which is why nothing caught it
+earlier.)
 
 ### Current project
 
