@@ -26,17 +26,17 @@ type projectListOutput struct {
 }
 
 func (s *ProjectFlowSuite) TestListCreateList() {
-	out, err := s.RunCLI("project", "list", "--output", "json")
-	s.Require().NoError(err, out)
+	out, errOut, err := s.RunCLI("project", "list", "--output", "json")
+	s.Require().NoError(err, "stdout: %s\nstderr: %s", out, errOut)
 
 	var before projectListOutput
 	s.Require().NoError(json.Unmarshal([]byte(out), &before))
 
-	out, err = s.RunCLI("project", "create", "--name", "cli-created-project", "--output", "json")
-	s.Require().NoError(err, out)
+	out, errOut, err = s.RunCLI("project", "create", "--name", "cli-created-project", "--output", "json")
+	s.Require().NoError(err, "stdout: %s\nstderr: %s", out, errOut)
 
-	out, err = s.RunCLI("project", "list", "--output", "json")
-	s.Require().NoError(err, out)
+	out, errOut, err = s.RunCLI("project", "list", "--output", "json")
+	s.Require().NoError(err, "stdout: %s\nstderr: %s", out, errOut)
 
 	var after projectListOutput
 	s.Require().NoError(json.Unmarshal([]byte(out), &after))

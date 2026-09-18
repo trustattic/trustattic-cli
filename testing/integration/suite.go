@@ -3,10 +3,12 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 	"github.com/trustattic/trustattic-cli/internal/client"
@@ -30,12 +32,21 @@ type BaseTestSuite struct {
 	// of the bootstrapped project. Both are set by SetupSuite.
 	Token   string
 	Project string
+
+	// configHome is a throwaway directory RunCLI points the CLI's config
+	// lookup at, so a developer's real ~/.config/trustattic/config.yaml can
+	// never leak into a test run. See RunCLI.
+	configHome string
 }
 
 func ptr[T any](v T) *T { return &v }
 
 func (s *BaseTestSuite) SetupSuite() {
 	ctx := context.Background()
+
+	// Created from the suite-level T (not a per-test one) so it outlives
+	// every test in the suite; RunCLI points the CLI at it.
+	s.configHome = s.T().TempDir()
 
 	jwtHelper, err := helper.NewJWT()
 	s.Require().NoError(err)
@@ -100,6 +111,12 @@ func (s *BaseTestSuite) SetupSuite() {
 		XAuthToken: userJWT,
 	}, client.AccountTokensPostJSONRequestBody{
 		Name: ptr("cli-integration-test"),
+		// ExpireAt is a required field. Platform happens to tolerate the
+		// zero value (treating a zero/past expiry as "use the default"),
+		// but its own tests set it explicitly rather than lean on that, and
+		// so should this one - nothing here needs a token whose expiry is
+		// whatever the server decides.
+		ExpireAt: time.Now().Add(time.Hour),
 	})
 	s.Require().NoError(err)
 	s.Require().Equal(201, tokenResp.StatusCode(), string(tokenResp.Body))
@@ -119,12 +136,26 @@ func (s *BaseTestSuite) TearDownSuite() {
 
 // RunCLI execs the built trustattic binary with args, pointed at the
 // bootstrapped stack and authenticated as the bootstrapped service account.
-func (s *BaseTestSuite) RunCLI(args ...string) (stdout string, err error) {
+// stdout and stderr are returned separately: callers parse stdout as JSON,
+// and merging the two streams would let any warning the CLI writes to stderr
+// corrupt that parse.
+func (s *BaseTestSuite) RunCLI(args ...string) (stdout, stderr string, err error) {
 	cmd := exec.Command(BinaryPath, args...)
+	// TRUSTATTIC_TOKEN overrides the stored token, but nothing overrides
+	// the stored current_project - so without redirecting the CLI's config
+	// lookup, a developer's own `trustattic use <project>` would silently
+	// become the default project for every project-scoped test. Both env
+	// vars below are what os.UserConfigDir consults (XDG_CONFIG_HOME on
+	// Linux, $HOME on macOS), so setting both isolates the run on either.
 	cmd.Env = append(os.Environ(),
 		fmt.Sprintf("TRUSTATTIC_API_URL=%s", s.stack.PlatformURL),
 		fmt.Sprintf("TRUSTATTIC_TOKEN=%s", s.Token),
+		fmt.Sprintf("XDG_CONFIG_HOME=%s", s.configHome),
+		fmt.Sprintf("HOME=%s", s.configHome),
 	)
-	out, err := cmd.CombinedOutput()
-	return string(out), err
+	var outBuf, errBuf bytes.Buffer
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &errBuf
+	err = cmd.Run()
+	return outBuf.String(), errBuf.String(), err
 }
