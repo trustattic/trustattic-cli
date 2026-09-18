@@ -1,9 +1,6 @@
 package cli
 
 import (
-	"context"
-
-	"github.com/charmbracelet/fang"
 	"github.com/spf13/cobra"
 )
 
@@ -19,10 +16,4 @@ func NewRootCommand() *cobra.Command {
 	}
 	root.PersistentFlags().String("output", "", `output mode: "json", or empty for interactive (auto-detected)`)
 	return root
-}
-
-// Execute runs the CLI, wrapping the root command with Fang's styled
-// help/usage/error rendering.
-func Execute() error {
-	return fang.Execute(context.Background(), NewRootCommand())
 }
