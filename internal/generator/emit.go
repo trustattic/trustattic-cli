@@ -168,16 +168,16 @@ func renderCommandFunc(c GeneratedCommand) string {
 		// do not reorder this.
 		// cmd.Context(), not context.Background(): Fang runs the root
 		// command via root.ExecuteContext, so a generated command that uses
-		// the command's own context inherits whatever cancellation the root
-		// context carries, instead of pinning an uncancellable one.
+		// the command's own context inherits the root context's
+		// cancellation instead of pinning an uncancellable one.
 		//
-		// NB: fang.Execute only installs a signal.NotifyContext when it's
-		// given WithNotifySignal (see fang@v1.0.0 fang.go:167), and
-		// cmd/trustattic/main.go passes no options - so today this context
-		// is still the plain context.Background() main hands to
-		// fang.Execute, and Ctrl-C is handled by Go's default (fatal)
-		// signal disposition. This makes the plumbing correct and ready;
-		// graceful cancellation needs that one option added in main.go.
+		// This only means anything because cmd/trustattic/main.go passes
+		// fang.WithNotifySignal - that's what makes fang wrap the context
+		// in a signal.NotifyContext (it does so only when at least one
+		// signal is configured). The two go together: drop the option in
+		// main.go and Ctrl-C goes back to killing the process outright
+		// mid-request; use context.Background() here and the option in
+		// main.go has nothing to cancel.
 		callArgs := []string{"cmd.Context()"}
 		for _, f := range c.Flags {
 			pre, expr := convertPathParam(f.Value, f.GoIdent, f.GoIdent, "--"+f.Name)

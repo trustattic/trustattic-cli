@@ -319,9 +319,10 @@ func helpCommands(t *testing.T) []generator.GeneratedCommand {
 // TestEmitTagFile_UsesCommandContextNotBackground covers the Ctrl-C fix:
 // Fang runs the root command via root.ExecuteContext, so a generated command
 // must pass cmd.Context() through to the client call rather than pinning a
-// fresh, uncancellable context.Background(). (Cancellation only becomes
-// observable once main.go passes fang.WithNotifySignal - see the note at the
-// call-site in emit.go - but the context must be threaded either way.) The
+// fresh, uncancellable context.Background(). This is one half of the Ctrl-C
+// path; the other is main.go passing fang.WithNotifySignal, without which
+// there is no cancellation for this context to carry (see the note at the
+// call site in emit.go). The
 // "context" import must be gone from the file skeleton with it - nothing
 // else in a generated file references the package, and an unused import
 // wouldn't compile.
