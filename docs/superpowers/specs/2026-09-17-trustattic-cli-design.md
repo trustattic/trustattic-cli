@@ -54,7 +54,7 @@ Nothing about backup/project/schedule *semantics* is hand-coded.
 
 ## Command generation algorithm
 
-Verified against all 31 operations in the current spec.
+Verified against all 32 operations in the current spec.
 
 1. **Top-level command = the operation's OpenAPI `tag`** (`account`, `project`,
    `backup`, `connection`, `resource`, `schedule`). The `common` tag is

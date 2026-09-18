@@ -1512,10 +1512,10 @@ func TestLoadOperations_CapturesRequestBodyProperties(t *testing.T) {
 	require.False(t, byName["active"].Required)
 }
 
-func TestLoadOperations_RealPlatformSpec_Has31Operations(t *testing.T) {
+func TestLoadOperations_RealPlatformSpec_Has32Operations(t *testing.T) {
 	ops, err := generator.LoadOperations("../../spec/api.yaml")
 	require.NoError(t, err)
-	require.Len(t, ops, 31)
+	require.Len(t, ops, 32)
 }
 ```
 
@@ -1640,9 +1640,9 @@ it keeps this loader fast and avoids a second, redundant validation pass.
 - [ ] **Step 6: Run tests to verify they pass**
 
 Run: `go test ./internal/generator/... -v`
-Expected: PASS. `TestLoadOperations_RealPlatformSpec_Has31Operations` is the
+Expected: PASS. `TestLoadOperations_RealPlatformSpec_Has32Operations` is the
 one that exercises the vendored spec end-to-end — if the count differs from
-31, recount with `grep -c operationId: spec/api.yaml` and fix the test's
+32, recount with `grep -c operationId: spec/api.yaml` and fix the test's
 expected count (the spec may have changed since this plan was written), not
 the loader.
 
@@ -3815,7 +3815,7 @@ git commit -m "Finalize Makefile targets and document CLI usage in README"
 
 **Spec coverage:**
 - Two-stage generation (typed client + Cobra tree) — Tasks 2, 10-15.
-- Naming algorithm, verified against all 31 real operations — Tasks 11, 15 (`register_test.go`).
+- Naming algorithm, verified against all 32 real operations — Tasks 11, 15 (`register_test.go`).
 - Path params -> flags/positional, `project_slug` optional exception — Tasks 11, 12, 14.
 - Request body -> typed flags — Tasks 10, 12, 14.
 - Override table — Task 13.
