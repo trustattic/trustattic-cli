@@ -77,5 +77,32 @@ func TestEmitRegisterFile_FixtureSpec_ProducesValidGo(t *testing.T) {
 func TestGroupByTag_GroupsFixtureCommandsUnderWidget(t *testing.T) {
 	cmds := fixtureCommands(t)
 	groups := generator.GroupByTag(cmds)
-	require.Len(t, groups["widget"], 3)
+	require.Len(t, groups["widget"], 4)
+}
+
+// TestEmitTagFile_FlagPathParamOrderedBeforePositionalInCallSite is a
+// regression test for the bug this task was written to fix: call arguments
+// for path parameters must be emitted in URL order (leading flag-style
+// params first, then the trailing positional last), not positional-first.
+// WidgetPartGet's path is /widget/{widget_id}/part/{part_id}: widget_id is
+// a leading flag (Go ident "widgetID") and part_id is the trailing
+// positional (args[0]). A reversion to positional-first would still parse
+// as valid Go and every other fixture-based test would still pass, so this
+// asserts on the actual emitted call-site text, not just parseability.
+func TestEmitTagFile_FlagPathParamOrderedBeforePositionalInCallSite(t *testing.T) {
+	cmds := fixtureCommands(t)
+
+	var buf bytes.Buffer
+	require.NoError(t, generator.EmitTagFile(&buf, cmds))
+
+	out := buf.String()
+	require.Contains(t, out, "func NewWidgetPartGetCommand() *cobra.Command")
+	require.Contains(t, out,
+		"apiClient.WidgetPartGetWithResponse(\n"+
+			"\t\t\t\tcontext.Background(),\n"+
+			"\t\t\t\twidgetID,\n"+
+			"\t\t\t\targs[0],\n"+
+			"\t\t\t\t&client.WidgetPartGetParams{},\n"+
+			"\t\t\t)",
+	)
 }

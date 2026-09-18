@@ -40,3 +40,21 @@ paths:
       responses:
         "204":
           description: no content
+  /widget/{widget_id}/part/{part_id}:
+    get:
+      operationId: WidgetPartGet
+      tags: [widget]
+      parameters:
+        - name: widget_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: part_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok

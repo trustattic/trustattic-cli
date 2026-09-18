@@ -7,10 +7,10 @@ import (
 	"github.com/trustattic/trustattic-cli/internal/generator"
 )
 
-func TestLoadOperations_FixtureSpec_ReturnsAllThreeOperations(t *testing.T) {
+func TestLoadOperations_FixtureSpec_ReturnsAllFourOperations(t *testing.T) {
 	ops, err := generator.LoadOperations("testdata/fixture.yaml")
 	require.NoError(t, err)
-	require.Len(t, ops, 3)
+	require.Len(t, ops, 4)
 }
 
 func TestLoadOperations_CapturesTagMethodAndPath(t *testing.T) {
