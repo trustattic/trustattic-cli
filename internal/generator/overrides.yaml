@@ -1,0 +1,6 @@
+# operationId -> { group: [...], verb: "..." } overrides for the mechanical
+# naming algorithm in naming.go. Empty today - see naming_test.go's
+# TestBuildCommandSpecs_RealSpec_MatchesDesignDocCommandTree, which passes
+# against the real spec with no overrides needed. Add an entry here only
+# when the mechanical result reads badly; never add per-resource behavior.
+{}
