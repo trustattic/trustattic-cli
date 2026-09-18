@@ -1755,13 +1755,16 @@ func TestBuildCommandSpecs_TwoOpsSharingAnActionWord_NestAsAGroup(t *testing.T) 
 	}
 	specs := generator.BuildCommandSpecs(ops)
 
+	// BackupRestorePut's URL ends in the static "restore" segment, not a
+	// path param, so it gets no positional arg - both path params are
+	// flags. Only BackupRestoreGet's URL ends in {restore_id}.
 	create := specByID(t, specs, "BackupRestorePut")
 	require.Equal(t, []string{"restore"}, create.Group)
 	require.Equal(t, "create", create.Verb)
-	require.NotNil(t, create.Positional)
-	require.Equal(t, "backup_id", create.Positional.Name)
-	require.Len(t, create.Flags, 1)
+	require.Nil(t, create.Positional)
+	require.Len(t, create.Flags, 2)
 	require.Equal(t, "project_slug", create.Flags[0].Name)
+	require.Equal(t, "backup_id", create.Flags[1].Name)
 
 	get := specByID(t, specs, "BackupRestoreGet")
 	require.Equal(t, []string{"restore"}, get.Group)
@@ -1779,25 +1782,34 @@ func TestBuildCommandSpecs_SingleOpEmptyRemainder_UsesMechanicalVerb(t *testing.
 	}
 	specs := generator.BuildCommandSpecs(ops)
 
+	// The URL ends in the static "resource" segment, not {project_slug}, so
+	// there's no positional arg - project_slug is a flag, like every other
+	// plain "list" command.
 	list := specByID(t, specs, "ResourceGet")
 	require.Empty(t, list.Group)
 	require.Equal(t, "list", list.Verb)
-	require.NotNil(t, list.Positional) // project_slug is the only param
+	require.Nil(t, list.Positional)
+	require.Len(t, list.Flags, 1)
+	require.Equal(t, "project_slug", list.Flags[0].Name)
 }
 
-func TestBuildCommandSpecs_ActionOnASubResource_TrailingParamIsPositional(t *testing.T) {
+func TestBuildCommandSpecs_ActionOnAStaticTailURL_HasNoPositional(t *testing.T) {
 	ops := []generator.Operation{
 		op("connection", "ConnectionCheck", "GET", "/project/{project_slug}/connection/{connection_id}/check", "project_slug", "connection_id"),
 	}
 	specs := generator.BuildCommandSpecs(ops)
 
+	// The URL ends in the static "check" segment, not {connection_id} - by
+	// the URL-shape rule that means no positional arg here, even though
+	// connection_id is this command's obvious "target". Both path params
+	// become flags, in path order.
 	check := specByID(t, specs, "ConnectionCheck")
 	require.Empty(t, check.Group)
 	require.Equal(t, "check", check.Verb)
-	require.NotNil(t, check.Positional)
-	require.Equal(t, "connection_id", check.Positional.Name)
-	require.Len(t, check.Flags, 1)
+	require.Nil(t, check.Positional)
+	require.Len(t, check.Flags, 2)
 	require.Equal(t, "project_slug", check.Flags[0].Name)
+	require.Equal(t, "connection_id", check.Flags[1].Name)
 }
 ```
 
@@ -1969,10 +1981,20 @@ func BuildCommandSpecs(ops []Operation) []CommandSpec {
 			spec.Verb = mechanicalVerb(op)
 		}
 
+		// A path parameter is positional only when the operation's URL
+		// literally ends in it (classic get/update/delete-by-id shape).
+		// Every other path parameter - including one on a URL whose final
+		// segment is a static action word like "restore" or "check" - is a
+		// flag. This is a strict URL-shape check, not a judgment call about
+		// whether the operation "feels like" it targets that parameter.
 		if n := len(op.Params); n > 0 {
-			p := op.Params[n-1]
-			spec.Positional = &p
-			spec.Flags = append(spec.Flags, op.Params[:n-1]...)
+			if endsInPathParam(op) {
+				p := op.Params[n-1]
+				spec.Positional = &p
+				spec.Flags = append(spec.Flags, op.Params[:n-1]...)
+			} else {
+				spec.Flags = append(spec.Flags, op.Params...)
+			}
 		}
 
 		specs[i] = spec
@@ -2696,12 +2718,18 @@ func renderCommandFunc(c GeneratedCommand) string {
 	}
 	b.WriteString("\t\t\tapiClient, err := cli.NewAPIClient(cfg)\n\t\t\tif err != nil {\n\t\t\t\treturn err\n\t\t\t}\n")
 
+	// The real generated client method takes path parameters as positional
+	// Go arguments in URL order. c.Flags is already every path param
+	// *except* the positional one, in URL order, and (per naming.go) the
+	// positional one - when present - is always the URL's last path param.
+	// So "flags first, positional last" here reproduces URL order exactly;
+	// do not reorder this.
 	callArgs := []string{"context.Background()"}
-	if c.PositionalFlag != nil {
-		callArgs = append(callArgs, "args[0]")
-	}
 	for _, f := range c.Flags {
 		callArgs = append(callArgs, f.GoIdent)
+	}
+	if c.PositionalFlag != nil {
+		callArgs = append(callArgs, "args[0]")
 	}
 	callArgs = append(callArgs, fmt.Sprintf("&client.%sParams{}", opID))
 	if c.Spec.Operation.HasBody {
@@ -3808,7 +3836,18 @@ flow unchanged into `CommandSpec` (Task 11), `GeneratedCommand`/`FlagDef`
 (Task 17) both calls `client.NewClientWithResponses` on and later passes to
 `RunCLI` as `TRUSTATTIC_API_URL`.
 
-Two corrections made during review, both fixed inline in the File Structure
+A third correction, made during the subagent-driven-development preflight
+scan (after this plan was first approved, before Task 1 was dispatched):
+the positional-vs-flag rule as originally written contradicted 7 rows of
+the design spec's own worked command tree. Fixed by keeping the simpler,
+fully mechanical rule (positional iff the URL literally ends in that path
+param) as authoritative and correcting the 7 worked examples to match — see
+the design spec's dated note under its command tree, and this plan's
+Task 11 (`BuildCommandSpecs`, 3 tests) and Task 14 (`emit.go` call-arg
+ordering, which had the same bug independently: it built path-parameter
+call arguments positional-first instead of in URL order).
+
+Two further corrections made during the plan's own self-review, both fixed inline in the File Structure
 section above rather than left as discrepancies: it originally sketched a
 separate `internal/generator/templates/command.go.tmpl` file, which Task 14
 doesn't use (it builds emitted source with plain Go string-building —
