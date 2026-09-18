@@ -45,6 +45,19 @@ func (s *BaseTestSuite) SetupSuite() {
 	stack, err := container.Start(ctx, pubPEM)
 	s.Require().NoError(err)
 	s.stack = stack
+	// If any Require() below this point fails, testify calls t.FailNow(),
+	// which invokes runtime.Goexit() - SetupSuite never returns normally,
+	// so suite.Run() never gets to register TearDownSuite's defer, and the
+	// stack would otherwise leak. runtime.Goexit() still runs already-
+	// registered defers in this goroutine before it exits (see `go doc
+	// runtime.Goexit`), so this defer terminates the stack in that case. On
+	// a normal, fully-successful return, s.T().Failed() is false, this is a
+	// no-op, and TearDownSuite performs the real cleanup as before.
+	defer func() {
+		if s.T().Failed() {
+			s.stack.Terminate(ctx)
+		}
+	}()
 
 	apiClient, err := client.NewClientWithResponses(stack.PlatformURL)
 	s.Require().NoError(err)
