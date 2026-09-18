@@ -23,6 +23,21 @@ const (
 	ModeJSON
 )
 
+// ParseMode turns a --output flag value into a Mode, rejecting anything
+// that isn't a mode the CLI actually implements. Without this, a typo (or a
+// plausible-but-unsupported value like "yaml") silently fell through to the
+// styled/auto renderer and the user got no diagnostic at all.
+func ParseMode(value string) (Mode, error) {
+	switch value {
+	case "":
+		return ModeAuto, nil
+	case "json":
+		return ModeJSON, nil
+	default:
+		return ModeAuto, fmt.Errorf("unknown --output value %q: must be %q or omitted", value, "json")
+	}
+}
+
 // Render writes body (a raw JSON API response) to w, choosing table,
 // key-value, or JSON rendering generically from the response's shape - never
 // from which endpoint produced it.

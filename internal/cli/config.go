@@ -9,8 +9,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// DefaultAPIURL is used when TRUSTATTIC_API_URL is not set.
-const DefaultAPIURL = "https://api.trustattic.com"
+// DefaultAPIURL is used when TRUSTATTIC_API_URL is not set. It must include
+// the spec's `/api/v2` base path: the vendored spec declares it under
+// `servers:`, and the platform mounts every route beneath it, but
+// oapi-codegen's generated client does not embed the `servers:` block - the
+// caller-supplied base URL has to carry the full prefix itself.
+const DefaultAPIURL = "https://api.trustattic.com/api/v2"
 
 // ErrNotLoggedIn is returned by ResolveToken when no token is available from
 // either TRUSTATTIC_TOKEN or the config file.
@@ -58,7 +62,8 @@ func SaveConfig(cfg Config) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
 	}
 	data, err := yaml.Marshal(cfg)
@@ -67,6 +72,17 @@ func SaveConfig(cfg Config) error {
 	}
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		return fmt.Errorf("write config: %w", err)
+	}
+	// MkdirAll's and WriteFile's mode arguments only apply on *creation*
+	// (and are masked by umask even then). This file holds a service-account
+	// token, so tighten both explicitly on every save - otherwise a config
+	// file or directory that already exists with looser permissions keeps
+	// them forever, however it came to be that way.
+	if err := os.Chmod(dir, 0o700); err != nil {
+		return fmt.Errorf("secure config dir: %w", err)
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		return fmt.Errorf("secure config file: %w", err)
 	}
 	return nil
 }

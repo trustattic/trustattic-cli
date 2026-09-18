@@ -73,3 +73,20 @@ func TestRender_TTY_ArrayOfScalarsUnderData_PrintsEachValue(t *testing.T) {
 	require.Contains(t, out, "b")
 	require.Contains(t, out, "c")
 }
+
+func TestParseMode_AcceptsEmptyAndJSON(t *testing.T) {
+	mode, err := cli.ParseMode("")
+	require.NoError(t, err)
+	require.Equal(t, cli.ModeAuto, mode)
+
+	mode, err = cli.ParseMode("json")
+	require.NoError(t, err)
+	require.Equal(t, cli.ModeJSON, mode)
+}
+
+func TestParseMode_RejectsAnythingElse(t *testing.T) {
+	_, err := cli.ParseMode("yaml")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), `unknown --output value "yaml"`)
+	require.Contains(t, err.Error(), `"json"`)
+}
