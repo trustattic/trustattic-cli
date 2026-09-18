@@ -51,3 +51,25 @@ func TestRender_TTY_PlainObject_RendersAsKeyValue(t *testing.T) {
 	require.Contains(t, out, "name")
 	require.Contains(t, out, "acme")
 }
+
+func TestRender_TTY_ObjectUnderData_RendersAsKeyValue(t *testing.T) {
+	var buf bytes.Buffer
+	err := cli.Render(&buf, cli.ModeAuto, true, []byte(`{"data":{"create":true,"delete":false}}`))
+	require.NoError(t, err)
+	out := buf.String()
+	require.Contains(t, out, "create")
+	require.Contains(t, out, "true")
+	require.Contains(t, out, "delete")
+	require.Contains(t, out, "false")
+	require.NotContains(t, out, "map[")
+}
+
+func TestRender_TTY_ArrayOfScalarsUnderData_PrintsEachValue(t *testing.T) {
+	var buf bytes.Buffer
+	err := cli.Render(&buf, cli.ModeAuto, true, []byte(`{"data":["a","b","c"]}`))
+	require.NoError(t, err)
+	out := buf.String()
+	require.Contains(t, out, "a")
+	require.Contains(t, out, "b")
+	require.Contains(t, out, "c")
+}

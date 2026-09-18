@@ -47,6 +47,9 @@ func Render(w io.Writer, mode Mode, isTTY bool, body []byte) error {
 			if rows, ok := data.([]any); ok {
 				return renderTable(w, rows)
 			}
+			if kv, ok := data.(map[string]any); ok {
+				return renderKV(w, kv)
+			}
 		}
 		return renderKV(w, obj)
 	}
@@ -65,17 +68,27 @@ func renderTable(w io.Writer, rows []any) error {
 
 	seen := map[string]bool{}
 	var cols []string
+	anyObjects := false
 	for _, r := range rows {
 		obj, ok := r.(map[string]any)
 		if !ok {
 			continue
 		}
+		anyObjects = true
 		for k := range obj {
 			if !seen[k] {
 				seen[k] = true
 				cols = append(cols, k)
 			}
 		}
+	}
+	if !anyObjects {
+		for _, r := range rows {
+			if _, err := fmt.Fprintln(w, fmt.Sprint(r)); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 	sort.Strings(cols)
 
