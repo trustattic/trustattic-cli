@@ -57,9 +57,11 @@ Nothing about backup/project/schedule *semantics* is hand-coded.
 Verified against all 32 operations in the current spec.
 
 1. **Top-level command = the operation's OpenAPI `tag`** (`account`, `project`,
-   `backup`, `connection`, `resource`, `schedule`). The `common` tag is
-   special-cased to ungrouped top-level commands (`healthcheck`, `permissions`,
-   `external-types`) since it isn't a real resource.
+   `backup`, `connection`, `schedule` — there is no standalone `resource`
+   tag; `ResourceGet` is tagged `connection`, see the note under the command
+   tree below). The `common` tag is special-cased to ungrouped top-level
+   commands (`healthcheck`, `permissions`, `external-types`) since it isn't
+   a real resource.
 2. Split the `operationId` on PascalCase word boundaries and strip:
    - the leading word, if it matches the tag,
    - any word matching an HTTP method (`Get`/`Post`/`Put`/`Delete`/`Patch`),
@@ -129,8 +131,7 @@ trustattic connection create --project <slug>
 trustattic connection update <connection_id> --project <slug>
 trustattic connection delete <connection_id> --project <slug>
 trustattic connection check --connection-id <id> --project <slug>
-
-trustattic resource list --project <slug>
+trustattic connection resource --project <slug>
 
 trustattic schedule list --project <slug>
 trustattic schedule create --project <slug>
@@ -159,6 +160,15 @@ above (none of their URLs end in a path parameter), so the rule, not the
 worked examples, was kept as the single source of truth; these seven now
 take their id via a required flag instead, matching every other
 static-tail-URL command.)
+
+(Revised during implementation, Task 11: `ResourceGet` is tagged
+`connection` in the vendored spec — there is no `resource` tag at all, so
+the standalone `trustattic resource list` command this design originally
+assumed doesn't exist mechanically. Confirmed directly against
+`spec/api.yaml` rather than assumed; the resulting command is
+`trustattic connection resource --project <slug>`. This is spec drift
+relative to an earlier reading of the API, not a generator defect —
+`ResourceGet`'s own tag is what determines this.)
 
 ## Charm.land styling
 
