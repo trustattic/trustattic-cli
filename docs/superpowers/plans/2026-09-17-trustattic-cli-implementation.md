@@ -237,8 +237,14 @@ package tools
 ```bash
 go get github.com/oapi-codegen/oapi-codegen/v2@v2.5.0
 go get github.com/oapi-codegen/runtime@v1.1.2
-cd tools && go generate ./... && cd ..
+cd tools && go generate -tags=tools ./... && cd ..
 ```
+
+`tools.go` is gated by `//go:build tools` (a deliberate convention that
+keeps codegen-only dependencies out of the main build) — plain
+`go generate ./...` silently matches nothing under that tag, so the
+`-tags=tools` flag is required every time this is invoked, including in the
+Makefile below.
 
 - [ ] **Step 4: Write a compile-level smoke test**
 
@@ -275,7 +281,7 @@ update-spec:
 	cp ../platform/api.yaml spec/api.yaml
 
 generate:
-	cd tools && go generate ./...
+	cd tools && go generate -tags=tools ./...
 
 build:
 	go build -o dist/trustattic ./cmd/trustattic
@@ -3133,7 +3139,7 @@ and `get`.
 ```makefile
 # Makefile — replace the existing generate target
 generate:
-	cd tools && go generate ./...
+	cd tools && go generate -tags=tools ./...
 	go run ./cmd/gen
 ```
 
@@ -3730,7 +3736,7 @@ update-spec:
 	cp ../platform/api.yaml spec/api.yaml
 
 generate:
-	cd tools && go generate ./...
+	cd tools && go generate -tags=tools ./...
 	go run ./cmd/gen
 
 build:
