@@ -77,14 +77,16 @@ Verified against all 31 operations in the current spec.
      path ends in a path param → `get` / `update` / `delete`; path ends in a
      static segment → `list` / `create`.
 4. Path parameters become required flags (`--account-id`, `--project`,
-   `--backup-id`, `--connection-id`, `--schedule-id`), except the **last path
-   parameter in the operation's path** (not necessarily the final URL segment —
-   e.g. `backup_id` is last-parameter for `POST .../backup/{backup_id}/restore`
-   even though the URL ends in the static `restore`), which becomes a required
-   positional argument instead. This applies uniformly, not just to
-   get/update/delete-by-id commands (e.g. `trustattic project accounts <slug>`
-   and `trustattic connection check <connection_id> --project <slug>` also take
-   their sole path param positionally).
+   `--backup-id`, `--connection-id`, `--schedule-id`), except when the
+   operation's URL **literally ends in a path parameter** (`GET`/`PUT`/
+   `DELETE` `.../{id}`-shaped operations), in which case that trailing
+   parameter becomes a required positional argument instead and every
+   earlier parameter stays a flag. A path parameter on a URL that ends in a
+   *static* segment — even an action word like `restore`/`check`/`run`/
+   `history` (`POST .../backup/{backup_id}/restore`,
+   `GET .../connection/{connection_id}/check`) — is always a flag, never
+   positional; there is no separate "is this an action" judgment call, only
+   this one URL-shape check.
 
    One exception, keyed purely on parameter *name* (not on any per-resource
    logic): a flag bound to a path parameter literally named `project_slug` is
@@ -114,19 +116,19 @@ trustattic project list
 trustattic project create
 trustattic project get <slug>
 trustattic project update <slug>
-trustattic project accounts <slug>
-trustattic project invite <slug>
-trustattic project permissions <slug>
+trustattic project accounts --project <slug>
+trustattic project invite --project <slug>
+trustattic project permissions --project <slug>
 
 trustattic backup list --project <slug>
-trustattic backup restore create <backup_id> --project <slug>
+trustattic backup restore create --backup-id <id> --project <slug>
 trustattic backup restore get <restore_id> --backup-id <backup_id> --project <slug>
 
 trustattic connection list --project <slug>
 trustattic connection create --project <slug>
 trustattic connection update <connection_id> --project <slug>
 trustattic connection delete <connection_id> --project <slug>
-trustattic connection check <connection_id> --project <slug>
+trustattic connection check --connection-id <id> --project <slug>
 
 trustattic resource list --project <slug>
 
@@ -134,8 +136,8 @@ trustattic schedule list --project <slug>
 trustattic schedule create --project <slug>
 trustattic schedule update <schedule_id> --project <slug>
 trustattic schedule delete <schedule_id> --project <slug>
-trustattic schedule run <schedule_id> --project <slug>
-trustattic schedule history <schedule_id> --project <slug>
+trustattic schedule run --schedule-id <id> --project <slug>
+trustattic schedule history --schedule-id <id> --project <slug>
 
 trustattic healthcheck
 trustattic permissions
@@ -148,6 +150,15 @@ trustattic use --clear     # unset it
 
 `--project <slug>` above is optional on every command that has it — see "Current
 project" under Auth & config.
+
+(Revised during implementation planning: seven commands —
+`project accounts/invite/permissions`, `backup restore create`,
+`connection check`, `schedule run`/`history` — were originally drafted with
+their id taken positionally. That contradicted the URL-shape rule in step 4
+above (none of their URLs end in a path parameter), so the rule, not the
+worked examples, was kept as the single source of truth; these seven now
+take their id via a required flag instead, matching every other
+static-tail-URL command.)
 
 ## Charm.land styling
 
