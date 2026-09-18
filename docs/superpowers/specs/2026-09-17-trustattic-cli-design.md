@@ -98,10 +98,18 @@ Verified against all 32 operations in the current spec.
    One exception, keyed purely on parameter *name* (not on any per-resource
    logic): a flag bound to a path parameter literally named `project_slug` is
    emitted as **optional** rather than required. See "Current project" below.
-5. Request bodies: one flag per top-level JSON body property, required flags for
-   required properties, typed from the schema (string/bool/int/enum). (Every
-   request body in the current spec is flat; a nested-object escape hatch is out
-   of scope until the spec needs one.)
+5. Request bodies: one flag per flat-scalar (string/bool/int/enum) top-level JSON
+   body property, required flags for required properties. A body property that
+   isn't flat-scalar (an array or object — e.g. `permissions`, `scope`,
+   `access_data`, `selector`, `settings`) gets no flag; a nested-object escape
+   hatch is out of scope until the spec needs one. If such a property is
+   **required**, the generated command fails fast with a clear error before
+   making any API call, naming the field, rather than silently sending an
+   incomplete request (this makes `project invite`, `schedule create`, and
+   `schedule update` currently non-functional — a real, deliberate limitation,
+   not a bug). If it's **optional**, the command still works but the property is
+   always omitted; its `--help` text names the omitted field so this isn't
+   silent.
 
 ### Query parameters: out of scope for v1
 
