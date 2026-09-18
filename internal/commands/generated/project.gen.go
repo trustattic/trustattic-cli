@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
@@ -223,41 +222,7 @@ func NewProjectInvitePutCommand() *cobra.Command {
 		Use:  "invite",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := cli.LoadConfig()
-			if err != nil {
-				return err
-			}
-			if project == "" {
-				project = cfg.CurrentProject
-			}
-			if project == "" {
-				return fmt.Errorf("no project set: pass --project or run `trustattic use <project>`")
-			}
-			apiClient, err := cli.NewAPIClient(cfg)
-			if err != nil {
-				return err
-			}
-			resp, err := apiClient.ProjectInvitePutWithResponse(
-				context.Background(),
-				project,
-				&client.ProjectInvitePutParams{},
-				client.ProjectInvitePutJSONRequestBody{
-					Email: openapi_types.Email(email),
-				},
-			)
-			if err != nil {
-				return err
-			}
-			if resp.StatusCode() >= 400 {
-				cli.RenderError(cmd.ErrOrStderr(), &cli.APIError{StatusCode: resp.StatusCode(), Body: resp.Body})
-				return fmt.Errorf("request failed with status %d", resp.StatusCode())
-			}
-			mode := cli.ModeAuto
-			if out, _ := cmd.Flags().GetString("output"); out == "json" {
-				mode = cli.ModeJSON
-			}
-			isTTY := term.IsTerminal(int(os.Stdout.Fd()))
-			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
+			return fmt.Errorf("this command is not yet supported: request body field(s) \"permissions\" (type \"array\") cannot be set via CLI flags")
 		},
 	}
 	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")

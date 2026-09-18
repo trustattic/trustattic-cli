@@ -1,0 +1,70 @@
+openapi: 3.0.3
+info:
+  title: Formats Fixture API
+  version: v1
+paths:
+  /gadget/{gadget_id}:
+    put:
+      operationId: GadgetPut
+      tags: [gadget]
+      parameters:
+        - name: gadget_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [owner_email]
+              properties:
+                owner_email:
+                  type: string
+                  format: email
+                reminder_at:
+                  type: string
+                  format: date-time
+      responses:
+        "200":
+          description: ok
+  /gadget:
+    post:
+      operationId: GadgetPost
+      tags: [gadget]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tags]
+              properties:
+                nickname:
+                  type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "201":
+          description: created
+  /gadget/{gadget_id}/reset:
+    post:
+      operationId: GadgetResetPost
+      tags: [gadget]
+      parameters:
+        - name: gadget_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "200":
+          description: ok

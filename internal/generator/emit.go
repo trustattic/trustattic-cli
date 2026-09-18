@@ -66,6 +66,14 @@ func EmitTagFile(w io.Writer, cmds []GeneratedCommand) error {
 		body.WriteString("\n")
 		body.WriteString(renderCommandFunc(c))
 
+		// A command with an unsupported-required-body-prop stub RunE never
+		// emits a client.-qualified expression or a conversion call at all
+		// (see renderCommandFunc) - its Flags/BodyFlags ValueKinds and
+		// HasParams/HasBody are irrelevant to this file's import needs.
+		if len(c.UnsupportedRequiredBodyProps) > 0 {
+			continue
+		}
+
 		// The client package is only referenced when a command builds a
 		// client.<OperationID>Params or client.<OperationID>JSONRequestBody
 		// value - some real operations (e.g. the "common" healthcheck
@@ -121,69 +129,80 @@ func renderCommandFunc(c GeneratedCommand) string {
 	}
 	fmt.Fprintf(&b, "\tcmd := &cobra.Command{\n\t\tUse:  %q,\n\t\tArgs: %s,\n\t\tRunE: func(cmd *cobra.Command, args []string) error {\n", use, args)
 
-	b.WriteString("\t\t\tcfg, err := cli.LoadConfig()\n\t\t\tif err != nil {\n\t\t\t\treturn err\n\t\t\t}\n")
-	for _, f := range c.Flags {
-		if !f.Optional {
-			continue
-		}
-		fmt.Fprintf(&b, "\t\t\tif %s == \"\" {\n\t\t\t\t%s = cfg.CurrentProject\n\t\t\t}\n", f.GoIdent, f.GoIdent)
-		fmt.Fprintf(&b, "\t\t\tif %s == \"\" {\n\t\t\t\treturn fmt.Errorf(\"no project set: pass --%s or run `trustattic use <project>`\")\n\t\t\t}\n", f.GoIdent, f.Name)
-	}
-	b.WriteString("\t\t\tapiClient, err := cli.NewAPIClient(cfg)\n\t\t\tif err != nil {\n\t\t\t\treturn err\n\t\t\t}\n")
-
-	// The real generated client method takes path parameters as positional
-	// Go arguments in URL order. c.Flags is already every path param
-	// *except* the positional one, in URL order, and (per naming.go) the
-	// positional one - when present - is always the URL's last path param.
-	// So "flags first, positional last" here reproduces URL order exactly;
-	// do not reorder this.
-	callArgs := []string{"context.Background()"}
-	for _, f := range c.Flags {
-		pre, expr := convertPathParam(f.Value, f.GoIdent, f.GoIdent, "--"+f.Name)
-		b.WriteString(pre)
-		callArgs = append(callArgs, expr)
-	}
-	if c.PositionalFlag != nil {
-		label := fmt.Sprintf("<%s>", c.Spec.Positional.Name)
-		pre, expr := convertPathParam(c.PositionalFlag.Value, c.PositionalFlag.GoIdent, "args[0]", label)
-		b.WriteString(pre)
-		callArgs = append(callArgs, expr)
-	}
-	// oapi-codegen only generates a <OperationID>Params argument when the
-	// operation declares at least one parameter (path, header, or query) in
-	// the spec - a handful of real operations (e.g. the "common" healthcheck
-	// endpoint) declare none at all, and WithResponse simply omits the
-	// argument for those.
-	if c.Spec.Operation.HasParams {
-		callArgs = append(callArgs, fmt.Sprintf("&client.%sParams{}", opID))
-	}
-	if c.Spec.Operation.HasBody {
-		if len(c.BodyFlags) == 0 {
-			// Every body property this operation declares has no flat CLI
-			// representation (or the body's schema is unconstrained, e.g.
-			// `schema: {}`, which oapi-codegen types as `interface{}`) - a
-			// `client.<OperationID>JSONRequestBody{}` composite literal
-			// isn't valid Go for an interface type, and there's nothing to
-			// populate either way, so pass nil.
-			callArgs = append(callArgs, "nil")
-		} else {
-			var pre strings.Builder
-			var props strings.Builder
-			for _, f := range c.BodyFlags {
-				p, expr := bodyPropExpr(f)
-				pre.WriteString(p)
-				fmt.Fprintf(&props, "\t\t\t\t%s: %s,\n", pascalCase(f.GoIdent), expr)
+	if len(c.UnsupportedRequiredBodyProps) > 0 {
+		// This operation requires a body property (an object/array/oneOf
+		// shape) that has no flat CLI representation - see isFlatScalar and
+		// BuildGeneratedCommands. Sending the request anyway would silently
+		// omit a field the server requires, so fail fast instead, before
+		// touching config, auth, or the network. Flags for this command's
+		// other (flat) properties, if any, are still declared and shown in
+		// --help below - only RunE is replaced.
+		fmt.Fprintf(&b, "\t\t\treturn fmt.Errorf(%q)\n", unsupportedBodyError(c.UnsupportedRequiredBodyProps))
+	} else {
+		b.WriteString("\t\t\tcfg, err := cli.LoadConfig()\n\t\t\tif err != nil {\n\t\t\t\treturn err\n\t\t\t}\n")
+		for _, f := range c.Flags {
+			if !f.Optional {
+				continue
 			}
-			b.WriteString(pre.String())
-			callArgs = append(callArgs, fmt.Sprintf("client.%sJSONRequestBody{\n%s\t\t\t}", opID, props.String()))
+			fmt.Fprintf(&b, "\t\t\tif %s == \"\" {\n\t\t\t\t%s = cfg.CurrentProject\n\t\t\t}\n", f.GoIdent, f.GoIdent)
+			fmt.Fprintf(&b, "\t\t\tif %s == \"\" {\n\t\t\t\treturn fmt.Errorf(\"no project set: pass --%s or run `trustattic use <project>`\")\n\t\t\t}\n", f.GoIdent, f.Name)
 		}
-	}
-	fmt.Fprintf(&b, "\t\t\tresp, err := apiClient.%sWithResponse(\n\t\t\t\t%s,\n\t\t\t)\n", opID, strings.Join(callArgs, ",\n\t\t\t\t"))
+		b.WriteString("\t\t\tapiClient, err := cli.NewAPIClient(cfg)\n\t\t\tif err != nil {\n\t\t\t\treturn err\n\t\t\t}\n")
 
-	b.WriteString("\t\t\tif err != nil {\n\t\t\t\treturn err\n\t\t\t}\n")
-	b.WriteString("\t\t\tif resp.StatusCode() >= 400 {\n\t\t\t\tcli.RenderError(cmd.ErrOrStderr(), &cli.APIError{StatusCode: resp.StatusCode(), Body: resp.Body})\n\t\t\t\treturn fmt.Errorf(\"request failed with status %d\", resp.StatusCode())\n\t\t\t}\n")
-	b.WriteString("\t\t\tmode := cli.ModeAuto\n\t\t\tif out, _ := cmd.Flags().GetString(\"output\"); out == \"json\" {\n\t\t\t\tmode = cli.ModeJSON\n\t\t\t}\n")
-	b.WriteString("\t\t\tisTTY := term.IsTerminal(int(os.Stdout.Fd()))\n\t\t\treturn cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)\n")
+		// The real generated client method takes path parameters as positional
+		// Go arguments in URL order. c.Flags is already every path param
+		// *except* the positional one, in URL order, and (per naming.go) the
+		// positional one - when present - is always the URL's last path param.
+		// So "flags first, positional last" here reproduces URL order exactly;
+		// do not reorder this.
+		callArgs := []string{"context.Background()"}
+		for _, f := range c.Flags {
+			pre, expr := convertPathParam(f.Value, f.GoIdent, f.GoIdent, "--"+f.Name)
+			b.WriteString(pre)
+			callArgs = append(callArgs, expr)
+		}
+		if c.PositionalFlag != nil {
+			label := fmt.Sprintf("<%s>", c.Spec.Positional.Name)
+			pre, expr := convertPathParam(c.PositionalFlag.Value, c.PositionalFlag.GoIdent, "args[0]", label)
+			b.WriteString(pre)
+			callArgs = append(callArgs, expr)
+		}
+		// oapi-codegen only generates a <OperationID>Params argument when the
+		// operation declares at least one parameter (path, header, or query) in
+		// the spec - a handful of real operations (e.g. the "common" healthcheck
+		// endpoint) declare none at all, and WithResponse simply omits the
+		// argument for those.
+		if c.Spec.Operation.HasParams {
+			callArgs = append(callArgs, fmt.Sprintf("&client.%sParams{}", opID))
+		}
+		if c.Spec.Operation.HasBody {
+			if len(c.BodyFlags) == 0 {
+				// Every body property this operation declares has no flat CLI
+				// representation (or the body's schema is unconstrained, e.g.
+				// `schema: {}`, which oapi-codegen types as `interface{}`) - a
+				// `client.<OperationID>JSONRequestBody{}` composite literal
+				// isn't valid Go for an interface type, and there's nothing to
+				// populate either way, so pass nil.
+				callArgs = append(callArgs, "nil")
+			} else {
+				var pre strings.Builder
+				var props strings.Builder
+				for _, f := range c.BodyFlags {
+					p, expr := bodyPropExpr(f)
+					pre.WriteString(p)
+					fmt.Fprintf(&props, "\t\t\t\t%s: %s,\n", pascalCase(f.GoIdent), expr)
+				}
+				b.WriteString(pre.String())
+				callArgs = append(callArgs, fmt.Sprintf("client.%sJSONRequestBody{\n%s\t\t\t}", opID, props.String()))
+			}
+		}
+		fmt.Fprintf(&b, "\t\t\tresp, err := apiClient.%sWithResponse(\n\t\t\t\t%s,\n\t\t\t)\n", opID, strings.Join(callArgs, ",\n\t\t\t\t"))
+
+		b.WriteString("\t\t\tif err != nil {\n\t\t\t\treturn err\n\t\t\t}\n")
+		b.WriteString("\t\t\tif resp.StatusCode() >= 400 {\n\t\t\t\tcli.RenderError(cmd.ErrOrStderr(), &cli.APIError{StatusCode: resp.StatusCode(), Body: resp.Body})\n\t\t\t\treturn fmt.Errorf(\"request failed with status %d\", resp.StatusCode())\n\t\t\t}\n")
+		b.WriteString("\t\t\tmode := cli.ModeAuto\n\t\t\tif out, _ := cmd.Flags().GetString(\"output\"); out == \"json\" {\n\t\t\t\tmode = cli.ModeJSON\n\t\t\t}\n")
+		b.WriteString("\t\t\tisTTY := term.IsTerminal(int(os.Stdout.Fd()))\n\t\t\treturn cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)\n")
+	}
 	b.WriteString("\t\t},\n\t}\n")
 
 	for _, f := range c.Flags {
@@ -211,6 +230,26 @@ func renderCommandFunc(c GeneratedCommand) string {
 	}
 	b.WriteString("\treturn cmd\n}\n")
 	return b.String()
+}
+
+// unsupportedBodyError builds the message for a command whose operation
+// requires at least one body property isFlatScalar filtered out of
+// BodyFlags (see UnsupportedRequiredBodyProps). It names every such
+// property so the generic, spec-driven rule ("required && !isFlatScalar")
+// stays legible no matter which operation(s) it fires for.
+func unsupportedBodyError(props []UnsupportedBodyProp) string {
+	parts := make([]string, len(props))
+	for i, p := range props {
+		typ := p.Type
+		if typ == "" {
+			typ = "oneOf/unknown"
+		}
+		parts[i] = fmt.Sprintf("%q (type %q)", p.Name, typ)
+	}
+	return fmt.Sprintf(
+		"this command is not yet supported: request body field(s) %s cannot be set via CLI flags",
+		strings.Join(parts, ", "),
+	)
 }
 
 // convertPathParam returns the Go expression that should be passed as a

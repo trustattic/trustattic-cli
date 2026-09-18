@@ -67,42 +67,7 @@ func NewSchedulePostCommand() *cobra.Command {
 		Use:  "create",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := cli.LoadConfig()
-			if err != nil {
-				return err
-			}
-			if project == "" {
-				project = cfg.CurrentProject
-			}
-			if project == "" {
-				return fmt.Errorf("no project set: pass --project or run `trustattic use <project>`")
-			}
-			apiClient, err := cli.NewAPIClient(cfg)
-			if err != nil {
-				return err
-			}
-			resp, err := apiClient.SchedulePostWithResponse(
-				context.Background(),
-				project,
-				&client.SchedulePostParams{},
-				client.SchedulePostJSONRequestBody{
-					CronExpression: cronExpression,
-					Name:           &name,
-				},
-			)
-			if err != nil {
-				return err
-			}
-			if resp.StatusCode() >= 400 {
-				cli.RenderError(cmd.ErrOrStderr(), &cli.APIError{StatusCode: resp.StatusCode(), Body: resp.Body})
-				return fmt.Errorf("request failed with status %d", resp.StatusCode())
-			}
-			mode := cli.ModeAuto
-			if out, _ := cmd.Flags().GetString("output"); out == "json" {
-				mode = cli.ModeJSON
-			}
-			isTTY := term.IsTerminal(int(os.Stdout.Fd()))
-			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
+			return fmt.Errorf("this command is not yet supported: request body field(s) \"selector\" (type \"oneOf/unknown\"), \"settings\" (type \"object\") cannot be set via CLI flags")
 		},
 	}
 	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")
@@ -169,47 +134,7 @@ func NewSchedulePutCommand() *cobra.Command {
 		Use:  "update <schedule_id>",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := cli.LoadConfig()
-			if err != nil {
-				return err
-			}
-			if project == "" {
-				project = cfg.CurrentProject
-			}
-			if project == "" {
-				return fmt.Errorf("no project set: pass --project or run `trustattic use <project>`")
-			}
-			apiClient, err := cli.NewAPIClient(cfg)
-			if err != nil {
-				return err
-			}
-			scheduleIDParsed, err := uuid.Parse(args[0])
-			if err != nil {
-				return fmt.Errorf("invalid <schedule_id>: %w", err)
-			}
-			resp, err := apiClient.SchedulePutWithResponse(
-				context.Background(),
-				project,
-				scheduleIDParsed,
-				&client.SchedulePutParams{},
-				client.SchedulePutJSONRequestBody{
-					CronExpression: cronExpression,
-					Name:           &name,
-				},
-			)
-			if err != nil {
-				return err
-			}
-			if resp.StatusCode() >= 400 {
-				cli.RenderError(cmd.ErrOrStderr(), &cli.APIError{StatusCode: resp.StatusCode(), Body: resp.Body})
-				return fmt.Errorf("request failed with status %d", resp.StatusCode())
-			}
-			mode := cli.ModeAuto
-			if out, _ := cmd.Flags().GetString("output"); out == "json" {
-				mode = cli.ModeJSON
-			}
-			isTTY := term.IsTerminal(int(os.Stdout.Fd()))
-			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
+			return fmt.Errorf("this command is not yet supported: request body field(s) \"selector\" (type \"oneOf/unknown\"), \"settings\" (type \"object\") cannot be set via CLI flags")
 		},
 	}
 	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")

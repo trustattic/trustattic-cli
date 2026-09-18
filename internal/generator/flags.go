@@ -125,6 +125,18 @@ type FlagDef struct {
 	Optional bool // true only for the project flag
 }
 
+// UnsupportedBodyProp is a required request-body property that isFlatScalar
+// filtered out of BodyFlags - it has no flat CLI representation (an
+// object/array/oneOf shape), but unlike an optional property in the same
+// situation, silently omitting it from the request body would send an
+// incomplete request the server can reject (or worse, silently accept with
+// the field missing/zero-valued). GeneratedCommand carries these so the
+// generated command can fail fast with a clear error instead.
+type UnsupportedBodyProp struct {
+	Name string
+	Type string // OpenAPI schema type; "" for a oneOf/anyOf union with no direct type
+}
+
 // GeneratedCommand is a fully-resolved, template-ready description of one
 // generated Cobra command.
 type GeneratedCommand struct {
@@ -132,6 +144,14 @@ type GeneratedCommand struct {
 	PositionalFlag *FlagDef
 	Flags          []FlagDef // path-param flags, excluding the positional one
 	BodyFlags      []FlagDef // request body property flags
+
+	// UnsupportedRequiredBodyProps lists every required body property this
+	// command's operation declares that isFlatScalar excluded from
+	// BodyFlags. Non-empty here means the command cannot be correctly
+	// implemented via flat CLI flags yet - see emit.go, which renders such
+	// a command's RunE as an immediate, descriptive error instead of a real
+	// (silently incomplete) request.
+	UnsupportedRequiredBodyProps []UnsupportedBodyProp
 }
 
 // BuildGeneratedCommands resolves every CommandSpec's path parameters and
@@ -161,7 +181,16 @@ func BuildGeneratedCommands(specs []CommandSpec) []GeneratedCommand {
 		for _, bp := range s.Operation.BodyProps {
 			if !isFlatScalar(bp.Type) {
 				// No flat CLI representation for an object/array/union body
-				// property - it's simply not exposed as a flag.
+				// property - it's simply not exposed as a flag. If it's
+				// required, that's not a property we can just drop quietly:
+				// record it so emit.go can make the command fail fast
+				// instead of silently sending an incomplete request.
+				if bp.Required {
+					gc.UnsupportedRequiredBodyProps = append(gc.UnsupportedRequiredBodyProps, UnsupportedBodyProp{
+						Name: bp.Name,
+						Type: bp.Type,
+					})
+				}
 				continue
 			}
 			name := strings.ReplaceAll(bp.Name, "_", "-")
