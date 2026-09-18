@@ -1,4 +1,4 @@
-.PHONY: generate update-spec build test
+.PHONY: generate update-spec build test test-integration
 
 update-spec:
 	cp ../platform/api.yaml spec/api.yaml
@@ -12,3 +12,6 @@ build:
 
 test:
 	go test ./...
+
+test-integration:
+	go test -tags=integration ./testing/... -v -timeout 5m
