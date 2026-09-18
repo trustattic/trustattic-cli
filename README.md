@@ -18,8 +18,8 @@ trustattic login --token <service-account-token>
 trustattic use my-project        # set a default --project for every command below
 trustattic project list
 trustattic project create --name "New Project"
-trustattic backup list
-trustattic schedule run <schedule_id>
+trustattic backup list --project my-project
+trustattic schedule run --schedule-id <id> --project my-project
 ```
 
 Pass `--output json` (or pipe to another program) for raw JSON instead of
