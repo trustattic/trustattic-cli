@@ -1,0 +1,42 @@
+openapi: 3.0.3
+info:
+  title: Fixture API
+  version: v1
+paths:
+  /widget:
+    get:
+      operationId: WidgetGet
+      tags: [widget]
+      responses:
+        "200":
+          description: ok
+    post:
+      operationId: WidgetPost
+      tags: [widget]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                active:
+                  type: boolean
+      responses:
+        "201":
+          description: created
+  /widget/{widget_id}:
+    delete:
+      operationId: WidgetDelete
+      tags: [widget]
+      parameters:
+        - name: widget_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: no content
