@@ -2,7 +2,6 @@
 package generated
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -17,8 +16,9 @@ import (
 func NewBackupGetCommand() *cobra.Command {
 	var project string
 	cmd := &cobra.Command{
-		Use:  "list",
-		Args: cobra.NoArgs,
+		Use:   "list",
+		Short: "List of backups",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -35,7 +35,7 @@ func NewBackupGetCommand() *cobra.Command {
 				return err
 			}
 			resp, err := apiClient.BackupGetWithResponse(
-				context.Background(),
+				cmd.Context(),
 				project,
 				&client.BackupGetParams{},
 			)
@@ -54,7 +54,7 @@ func NewBackupGetCommand() *cobra.Command {
 			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")
+	cmd.Flags().StringVar(&project, "project", "", "Slug of the project (falls back to the current project set via `trustattic use`)")
 	return cmd
 }
 
@@ -62,8 +62,9 @@ func NewBackupRestorePutCommand() *cobra.Command {
 	var project string
 	var backupID string
 	cmd := &cobra.Command{
-		Use:  "create",
-		Args: cobra.NoArgs,
+		Use:   "create",
+		Short: "Restore backup",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -84,7 +85,7 @@ func NewBackupRestorePutCommand() *cobra.Command {
 				return fmt.Errorf("invalid --backup-id: %w", err)
 			}
 			resp, err := apiClient.BackupRestorePutWithResponse(
-				context.Background(),
+				cmd.Context(),
 				project,
 				backupIDParsed,
 				&client.BackupRestorePutParams{},
@@ -105,8 +106,8 @@ func NewBackupRestorePutCommand() *cobra.Command {
 			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")
-	cmd.Flags().StringVar(&backupID, "backup-id", "", "backup-id")
+	cmd.Flags().StringVar(&project, "project", "", "Slug of the project (falls back to the current project set via `trustattic use`)")
+	cmd.Flags().StringVar(&backupID, "backup-id", "", "ID of the backup (required)")
 	_ = cmd.MarkFlagRequired("backup-id")
 	return cmd
 }
@@ -115,8 +116,9 @@ func NewBackupRestoreGetCommand() *cobra.Command {
 	var project string
 	var backupID string
 	cmd := &cobra.Command{
-		Use:  "get <restore_id>",
-		Args: cobra.ExactArgs(1),
+		Use:   "get <restore_id>",
+		Short: "Get backup restore status",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -141,7 +143,7 @@ func NewBackupRestoreGetCommand() *cobra.Command {
 				return fmt.Errorf("invalid <restore_id>: %w", err)
 			}
 			resp, err := apiClient.BackupRestoreGetWithResponse(
-				context.Background(),
+				cmd.Context(),
 				project,
 				backupIDParsed,
 				restoreIDParsed,
@@ -162,8 +164,8 @@ func NewBackupRestoreGetCommand() *cobra.Command {
 			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")
-	cmd.Flags().StringVar(&backupID, "backup-id", "", "backup-id")
+	cmd.Flags().StringVar(&project, "project", "", "Slug of the project (falls back to the current project set via `trustattic use`)")
+	cmd.Flags().StringVar(&backupID, "backup-id", "", "ID of the backup (required)")
 	_ = cmd.MarkFlagRequired("backup-id")
 	return cmd
 }

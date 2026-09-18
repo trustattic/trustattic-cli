@@ -1,0 +1,61 @@
+# A fixture dedicated to summary/description capture (emitted Short, Long,
+# and flag usage text) and to path-parameter ordering. Kept separate from
+# fixture.yaml and formats.yaml so it doesn't disturb the exact operation
+# counts and emitted-text assertions those fixtures back.
+openapi: 3.0.3
+info:
+    title: Help Fixture API
+    version: v1
+paths:
+    /doodad/{doodad_id}/part/{part_id}:
+        get:
+            operationId: DoodadPartGet
+            tags: [doodad]
+            summary: Get one part of a doodad
+            # Deliberately declared in the reverse of the URL's own order:
+            # part_id appears second in the URL template but first here.
+            parameters:
+                - name: part_id
+                  in: path
+                  required: true
+                  description: ID of the part
+                  schema:
+                      type: string
+                - name: doodad_id
+                  in: path
+                  required: true
+                  description: ID of the doodad
+                  schema:
+                      type: string
+            responses:
+                "200":
+                    description: ok
+    /doodad:
+        post:
+            operationId: DoodadPost
+            tags: [doodad]
+            summary: Create a new doodad
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            required: [label]
+                            properties:
+                                label:
+                                    type: string
+                                    description: Human-readable doodad label
+                                nickname:
+                                    type: string
+                                extras:
+                                    type: array
+                                    items:
+                                        type: string
+                                settings:
+                                    type: object
+                                    properties:
+                                        color:
+                                            type: string
+            responses:
+                "201":
+                    description: created

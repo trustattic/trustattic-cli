@@ -2,7 +2,6 @@
 package generated
 
 import (
-	"context"
 	"fmt"
 	"os"
 	gotime "time"
@@ -18,8 +17,9 @@ import (
 
 func NewAccountGetCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:  "list",
-		Args: cobra.NoArgs,
+		Use:   "list",
+		Short: "Returns the current user's accounts",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -30,7 +30,7 @@ func NewAccountGetCommand() *cobra.Command {
 				return err
 			}
 			resp, err := apiClient.AccountGetWithResponse(
-				context.Background(),
+				cmd.Context(),
 				&client.AccountGetParams{},
 			)
 			if err != nil {
@@ -55,8 +55,10 @@ func NewAccountPostCommand() *cobra.Command {
 	var email string
 	var name string
 	cmd := &cobra.Command{
-		Use:  "create",
-		Args: cobra.NoArgs,
+		Use:   "create",
+		Short: "Create a new account (only service accounts)",
+		Long:  "Create a new account (only service accounts)\n\nNote: the following fields cannot be set via CLI flags and are always omitted from the request: scope.",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -72,7 +74,7 @@ func NewAccountPostCommand() *cobra.Command {
 				emailEmail = &email
 			}
 			resp, err := apiClient.AccountPostWithResponse(
-				context.Background(),
+				cmd.Context(),
 				&client.AccountPostParams{},
 				client.AccountPostJSONRequestBody{
 					Email: emailEmail,
@@ -104,8 +106,9 @@ func NewAccountPutObtainCommand() *cobra.Command {
 	var issuer string
 	var name string
 	cmd := &cobra.Command{
-		Use:  "obtain",
-		Args: cobra.NoArgs,
+		Use:   "obtain",
+		Short: "Returns the current user's account; if AuthHeader token is not presented in the database, then the new account is created; if the account is INVITED, then the account is activated",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -116,7 +119,7 @@ func NewAccountPutObtainCommand() *cobra.Command {
 				return err
 			}
 			resp, err := apiClient.AccountPutObtainWithResponse(
-				context.Background(),
+				cmd.Context(),
 				&client.AccountPutObtainParams{},
 				client.AccountPutObtainJSONRequestBody{
 					Email:  openapi_types.Email(email),
@@ -139,11 +142,11 @@ func NewAccountPutObtainCommand() *cobra.Command {
 			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
 		},
 	}
-	cmd.Flags().StringVar(&email, "email", "", "email")
+	cmd.Flags().StringVar(&email, "email", "", "email (required)")
 	_ = cmd.MarkFlagRequired("email")
-	cmd.Flags().StringVar(&issuer, "issuer", "", "issuer")
+	cmd.Flags().StringVar(&issuer, "issuer", "", "issuer (required)")
 	_ = cmd.MarkFlagRequired("issuer")
-	cmd.Flags().StringVar(&name, "name", "", "name")
+	cmd.Flags().StringVar(&name, "name", "", "name (required)")
 	_ = cmd.MarkFlagRequired("name")
 	return cmd
 }
@@ -152,8 +155,10 @@ func NewAccountPutCommand() *cobra.Command {
 	var email string
 	var name string
 	cmd := &cobra.Command{
-		Use:  "update <account_id>",
-		Args: cobra.ExactArgs(1),
+		Use:   "update <account_id>",
+		Short: "Create a new account (only service accounts)",
+		Long:  "Create a new account (only service accounts)\n\nNote: the following fields cannot be set via CLI flags and are always omitted from the request: scope.",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -173,7 +178,7 @@ func NewAccountPutCommand() *cobra.Command {
 				emailEmail = &email
 			}
 			resp, err := apiClient.AccountPutWithResponse(
-				context.Background(),
+				cmd.Context(),
 				accountIDParsed,
 				&client.AccountPutParams{},
 				client.AccountPutJSONRequestBody{
@@ -204,8 +209,9 @@ func NewAccountPutCommand() *cobra.Command {
 func NewAccountTokensGetCommand() *cobra.Command {
 	var accountID string
 	cmd := &cobra.Command{
-		Use:  "list",
-		Args: cobra.NoArgs,
+		Use:   "list",
+		Short: "Returns a list of tokens for the account_id",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -220,7 +226,7 @@ func NewAccountTokensGetCommand() *cobra.Command {
 				return fmt.Errorf("invalid --account-id: %w", err)
 			}
 			resp, err := apiClient.AccountTokensGetWithResponse(
-				context.Background(),
+				cmd.Context(),
 				accountIDParsed,
 				&client.AccountTokensGetParams{},
 			)
@@ -239,7 +245,7 @@ func NewAccountTokensGetCommand() *cobra.Command {
 			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
 		},
 	}
-	cmd.Flags().StringVar(&accountID, "account-id", "", "account-id")
+	cmd.Flags().StringVar(&accountID, "account-id", "", "ID of the account (required)")
 	_ = cmd.MarkFlagRequired("account-id")
 	return cmd
 }
@@ -249,8 +255,9 @@ func NewAccountTokensPostCommand() *cobra.Command {
 	var expireAt string
 	var name string
 	cmd := &cobra.Command{
-		Use:  "create",
-		Args: cobra.NoArgs,
+		Use:   "create",
+		Short: "Create a new token (for SERVICE account only)",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -269,7 +276,7 @@ func NewAccountTokensPostCommand() *cobra.Command {
 				return fmt.Errorf("invalid --expire-at: %w", err)
 			}
 			resp, err := apiClient.AccountTokensPostWithResponse(
-				context.Background(),
+				cmd.Context(),
 				accountIDParsed,
 				&client.AccountTokensPostParams{},
 				client.AccountTokensPostJSONRequestBody{
@@ -292,19 +299,20 @@ func NewAccountTokensPostCommand() *cobra.Command {
 			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
 		},
 	}
-	cmd.Flags().StringVar(&accountID, "account-id", "", "account-id")
+	cmd.Flags().StringVar(&accountID, "account-id", "", "ID of the account (required)")
 	_ = cmd.MarkFlagRequired("account-id")
-	cmd.Flags().StringVar(&expireAt, "expire-at", "", "expire-at")
+	cmd.Flags().StringVar(&expireAt, "expire-at", "", "expire-at (required)")
 	_ = cmd.MarkFlagRequired("expire-at")
-	cmd.Flags().StringVar(&name, "name", "", "name")
+	cmd.Flags().StringVar(&name, "name", "", "Name of the token, if not defined, the name will be generated automatically.")
 	return cmd
 }
 
 func NewAccountTokensDeleteCommand() *cobra.Command {
 	var accountID string
 	cmd := &cobra.Command{
-		Use:  "delete <token_id>",
-		Args: cobra.ExactArgs(1),
+		Use:   "delete <token_id>",
+		Short: "Delete a token",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -323,7 +331,7 @@ func NewAccountTokensDeleteCommand() *cobra.Command {
 				return fmt.Errorf("invalid <token_id>: %w", err)
 			}
 			resp, err := apiClient.AccountTokensDeleteWithResponse(
-				context.Background(),
+				cmd.Context(),
 				accountIDParsed,
 				tokenIDParsed,
 				&client.AccountTokensDeleteParams{},
@@ -343,7 +351,7 @@ func NewAccountTokensDeleteCommand() *cobra.Command {
 			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
 		},
 	}
-	cmd.Flags().StringVar(&accountID, "account-id", "", "account-id")
+	cmd.Flags().StringVar(&accountID, "account-id", "", "ID of the account (required)")
 	_ = cmd.MarkFlagRequired("account-id")
 	return cmd
 }

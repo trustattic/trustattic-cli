@@ -81,7 +81,7 @@ func TestEmitTagFile_RequiredBodyPropIsMarkedRequired(t *testing.T) {
 	require.NoError(t, generator.EmitTagFile(&buf, cmds))
 
 	out := buf.String()
-	require.Contains(t, out, `cmd.Flags().StringVar(&name, "name", "", "name")`)
+	require.Contains(t, out, `cmd.Flags().StringVar(&name, "name", "", "name (required)")`)
 	require.Contains(t, out, `cmd.MarkFlagRequired("name")`)
 	require.NotContains(t, out, `MarkFlagRequired("active")`) // not required in the fixture
 }
@@ -129,7 +129,7 @@ func TestEmitTagFile_FlagPathParamOrderedBeforePositionalInCallSite(t *testing.T
 	require.Contains(t, out, "func NewWidgetPartGetCommand() *cobra.Command")
 	require.Contains(t, out,
 		"apiClient.WidgetPartGetWithResponse(\n"+
-			"\t\t\t\tcontext.Background(),\n"+
+			"\t\t\t\tcmd.Context(),\n"+
 			"\t\t\t\twidgetID,\n"+
 			"\t\t\t\targs[0],\n"+
 			"\t\t\t\t&client.WidgetPartGetParams{},\n"+
@@ -229,7 +229,7 @@ func TestEmitTagFile_EmptySchemaBody_PassesNilNotAnEmptyStructLiteral(t *testing
 	fn := extractFunc(t, buf.String(), "GadgetResetPost")
 	require.Contains(t, fn,
 		"apiClient.GadgetResetPostWithResponse(\n"+
-			"\t\t\t\tcontext.Background(),\n"+
+			"\t\t\t\tcmd.Context(),\n"+
 			"\t\t\t\tgadgetIDParsed,\n"+
 			"\t\t\t\t&client.GadgetResetPostParams{},\n"+
 			"\t\t\t\tnil,\n"+
@@ -302,4 +302,143 @@ func TestEmitTagFile_UnsupportedStubCommand_StillCompilesWithSharedFileImports(t
 	require.NotContains(t, out, `"github.com/trustattic/trustattic-cli/internal/client"`)
 	require.NotContains(t, out, `gotime "time"`)
 	require.NotContains(t, out, `openapi_types "github.com/oapi-codegen/runtime/types"`)
+}
+
+// helpCommands loads testdata/help.yaml - the fixture backing the
+// summary/description and path-parameter-ordering assertions below, kept
+// separate from the other two fixtures so it doesn't disturb their exact
+// operation counts or emitted-text assertions.
+func helpCommands(t *testing.T) []generator.GeneratedCommand {
+	t.Helper()
+	ops, err := generator.LoadOperations("testdata/help.yaml")
+	require.NoError(t, err)
+	specs := generator.BuildCommandSpecs(ops)
+	return generator.BuildGeneratedCommands(specs)
+}
+
+// TestEmitTagFile_UsesCommandContextNotBackground covers the Ctrl-C fix:
+// Fang runs the root command via root.ExecuteContext, so a generated command
+// must pass cmd.Context() through to the client call rather than pinning a
+// fresh, uncancellable context.Background(). (Cancellation only becomes
+// observable once main.go passes fang.WithNotifySignal - see the note at the
+// call-site in emit.go - but the context must be threaded either way.) The
+// "context" import must be gone from the file skeleton with it - nothing
+// else in a generated file references the package, and an unused import
+// wouldn't compile.
+func TestEmitTagFile_UsesCommandContextNotBackground(t *testing.T) {
+	cmds := fixtureCommands(t)
+
+	var buf bytes.Buffer
+	require.NoError(t, generator.EmitTagFile(&buf, cmds))
+
+	out := buf.String()
+	require.Contains(t, out, "cmd.Context(),")
+	require.NotContains(t, out, "context.Background()")
+	require.NotContains(t, out, `"context"`)
+}
+
+// TestEmitTagFile_OperationSummaryBecomesShort covers the --help fix: every
+// operation in the real spec carries a summary, and it belongs in the
+// generated command's Short so `--help` isn't blank.
+func TestEmitTagFile_OperationSummaryBecomesShort(t *testing.T) {
+	cmds := helpCommands(t)
+
+	var buf bytes.Buffer
+	require.NoError(t, generator.EmitTagFile(&buf, cmds))
+
+	require.Contains(t, extractFunc(t, buf.String(), "DoodadPartGet"),
+		`Short: "Get one part of a doodad",`)
+	require.Contains(t, extractFunc(t, buf.String(), "DoodadPost"),
+		`Short: "Create a new doodad",`)
+}
+
+// TestEmitTagFile_FlagUsageComesFromSpecDescription covers the other half of
+// the --help fix: a flag's usage string is the spec's description for the
+// underlying path parameter or body property (annotated with whether it's
+// required), not the flag name echoed back at the reader.
+func TestEmitTagFile_FlagUsageComesFromSpecDescription(t *testing.T) {
+	cmds := helpCommands(t)
+
+	var buf bytes.Buffer
+	require.NoError(t, generator.EmitTagFile(&buf, cmds))
+
+	require.Contains(t, extractFunc(t, buf.String(), "DoodadPartGet"),
+		`cmd.Flags().StringVar(&doodadID, "doodad-id", "", "ID of the doodad (required)")`)
+	require.Contains(t, extractFunc(t, buf.String(), "DoodadPost"),
+		`cmd.Flags().StringVar(&label, "label", "", "Human-readable doodad label (required)")`)
+	// A property with no spec description falls back to its own flag name.
+	require.Contains(t, extractFunc(t, buf.String(), "DoodadPost"),
+		`cmd.Flags().StringVar(&nickname, "nickname", "", "nickname")`)
+}
+
+// TestEmitTagFile_DroppedOptionalBodyProps_NamedInLongHelp is the
+// regression test for the silent-omission finding: DoodadPost's body has an
+// optional array ("extras") and an optional object ("settings"), neither of
+// which has a flat CLI representation. The command still runs - the request
+// is valid without them - but `--help` must say so instead of leaving the
+// omission invisible.
+func TestEmitTagFile_DroppedOptionalBodyProps_NamedInLongHelp(t *testing.T) {
+	cmds := helpCommands(t)
+
+	var buf bytes.Buffer
+	require.NoError(t, generator.EmitTagFile(&buf, cmds))
+
+	fn := extractFunc(t, buf.String(), "DoodadPost")
+	require.Contains(t, fn,
+		`Long: "Create a new doodad\n\nNote: the following fields cannot be set via CLI flags and are always omitted from the request: extras, settings.",`)
+	// The command is still a real, runnable command - this note is not the
+	// fail-fast stub required non-flat properties get.
+	require.Contains(t, fn, "cli.LoadConfig")
+	require.NotContains(t, fn, "this command is not yet supported")
+}
+
+// TestEmitTagFile_NoDroppedOptionalBodyProps_EmitsNoLong keeps the note from
+// leaking onto commands that have nothing to disclose.
+func TestEmitTagFile_NoDroppedOptionalBodyProps_EmitsNoLong(t *testing.T) {
+	cmds := helpCommands(t)
+
+	var buf bytes.Buffer
+	require.NoError(t, generator.EmitTagFile(&buf, cmds))
+
+	require.NotContains(t, extractFunc(t, buf.String(), "DoodadPartGet"), "Long:")
+}
+
+// TestEmitTagFile_OutOfURLOrderPathParams_EmittedInURLOrderAtCallSite is the
+// end-to-end half of the path-parameter ordering fix (see
+// TestLoadOperations_SortsPathParamsByURLOrderNotDeclarationOrder for the
+// loader half). help.yaml's DoodadPartGet declares part_id before doodad_id
+// while its URL is /doodad/{doodad_id}/part/{part_id}; the generated client
+// method takes path parameters positionally in URL order, so doodad_id (the
+// --doodad-id flag) must be passed before part_id (args[0]).
+func TestEmitTagFile_OutOfURLOrderPathParams_EmittedInURLOrderAtCallSite(t *testing.T) {
+	cmds := helpCommands(t)
+
+	var buf bytes.Buffer
+	require.NoError(t, generator.EmitTagFile(&buf, cmds))
+
+	require.Contains(t, buf.String(),
+		"apiClient.DoodadPartGetWithResponse(\n"+
+			"\t\t\t\tcmd.Context(),\n"+
+			"\t\t\t\tdoodadID,\n"+
+			"\t\t\t\targs[0],\n"+
+			"\t\t\t\t&client.DoodadPartGetParams{},\n"+
+			"\t\t\t)",
+	)
+	require.Contains(t, buf.String(), `Use:  "part <part_id>"`)
+}
+
+// TestEmitRegisterFile_GroupCommandsGetAGenericShort covers the parent-group
+// half of the --help fix. Group nodes aren't OpenAPI operations, so there's
+// no spec summary to use; a generic label is a deliberate presentational
+// default and still beats a blank line in `trustattic --help`.
+func TestEmitRegisterFile_GroupCommandsGetAGenericShort(t *testing.T) {
+	cmds := fixtureCommands(t)
+
+	var buf bytes.Buffer
+	require.NoError(t, generator.EmitRegisterFile(&buf, cmds))
+
+	_, err := parser.ParseFile(token.NewFileSet(), "register.gen.go", buf.Bytes(), parser.AllErrors)
+	require.NoError(t, err, "emitted source:\n%s", buf.String())
+	require.Contains(t, buf.String(),
+		`c := &cobra.Command{Use: use, Short: fmt.Sprintf("%s commands", use)}`)
 }

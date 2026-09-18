@@ -2,7 +2,6 @@
 package generated
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -14,8 +13,9 @@ import (
 
 func NewCommonExternalTypesCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:  "external-types",
-		Args: cobra.NoArgs,
+		Use:   "external-types",
+		Short: "List of external types that the platform uses",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -26,7 +26,7 @@ func NewCommonExternalTypesCommand() *cobra.Command {
 				return err
 			}
 			resp, err := apiClient.CommonExternalTypesWithResponse(
-				context.Background(),
+				cmd.Context(),
 			)
 			if err != nil {
 				return err
@@ -48,8 +48,9 @@ func NewCommonExternalTypesCommand() *cobra.Command {
 
 func NewCommonHealthcheckCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:  "healthcheck",
-		Args: cobra.NoArgs,
+		Use:   "healthcheck",
+		Short: "Healthcheck endpoint",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -60,7 +61,7 @@ func NewCommonHealthcheckCommand() *cobra.Command {
 				return err
 			}
 			resp, err := apiClient.CommonHealthcheckWithResponse(
-				context.Background(),
+				cmd.Context(),
 			)
 			if err != nil {
 				return err
@@ -82,8 +83,9 @@ func NewCommonHealthcheckCommand() *cobra.Command {
 
 func NewCommonPermissionsCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:  "permissions",
-		Args: cobra.NoArgs,
+		Use:   "permissions",
+		Short: "List of available permissions",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -94,7 +96,7 @@ func NewCommonPermissionsCommand() *cobra.Command {
 				return err
 			}
 			resp, err := apiClient.CommonPermissionsWithResponse(
-				context.Background(),
+				cmd.Context(),
 			)
 			if err != nil {
 				return err

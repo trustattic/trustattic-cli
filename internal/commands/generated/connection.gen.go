@@ -2,7 +2,6 @@
 package generated
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -17,8 +16,9 @@ import (
 func NewConnectionGetCommand() *cobra.Command {
 	var project string
 	cmd := &cobra.Command{
-		Use:  "list",
-		Args: cobra.NoArgs,
+		Use:   "list",
+		Short: "List of created provider connections",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -35,7 +35,7 @@ func NewConnectionGetCommand() *cobra.Command {
 				return err
 			}
 			resp, err := apiClient.ConnectionGetWithResponse(
-				context.Background(),
+				cmd.Context(),
 				project,
 				&client.ConnectionGetParams{},
 			)
@@ -54,7 +54,7 @@ func NewConnectionGetCommand() *cobra.Command {
 			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")
+	cmd.Flags().StringVar(&project, "project", "", "Slug of the project (falls back to the current project set via `trustattic use`)")
 	return cmd
 }
 
@@ -63,8 +63,10 @@ func NewConnectionPostCommand() *cobra.Command {
 	var name string
 	var providerKind string
 	cmd := &cobra.Command{
-		Use:  "create",
-		Args: cobra.NoArgs,
+		Use:   "create",
+		Short: "Create a connection to provider",
+		Long:  "Create a connection to provider\n\nNote: the following fields cannot be set via CLI flags and are always omitted from the request: access_data.",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -81,7 +83,7 @@ func NewConnectionPostCommand() *cobra.Command {
 				return err
 			}
 			resp, err := apiClient.ConnectionPostWithResponse(
-				context.Background(),
+				cmd.Context(),
 				project,
 				&client.ConnectionPostParams{},
 				client.ConnectionPostJSONRequestBody{
@@ -104,7 +106,7 @@ func NewConnectionPostCommand() *cobra.Command {
 			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")
+	cmd.Flags().StringVar(&project, "project", "", "Slug of the project (falls back to the current project set via `trustattic use`)")
 	cmd.Flags().StringVar(&name, "name", "", "name")
 	cmd.Flags().StringVar(&providerKind, "provider-kind", "", "provider-kind")
 	return cmd
@@ -113,8 +115,9 @@ func NewConnectionPostCommand() *cobra.Command {
 func NewConnectionDeleteCommand() *cobra.Command {
 	var project string
 	cmd := &cobra.Command{
-		Use:  "delete <connection_id>",
-		Args: cobra.ExactArgs(1),
+		Use:   "delete <connection_id>",
+		Short: "Delete a provider provider and all resources related to it",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -135,7 +138,7 @@ func NewConnectionDeleteCommand() *cobra.Command {
 				return fmt.Errorf("invalid <connection_id>: %w", err)
 			}
 			resp, err := apiClient.ConnectionDeleteWithResponse(
-				context.Background(),
+				cmd.Context(),
 				project,
 				connectionIDParsed,
 				&client.ConnectionDeleteParams{},
@@ -155,7 +158,7 @@ func NewConnectionDeleteCommand() *cobra.Command {
 			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")
+	cmd.Flags().StringVar(&project, "project", "", "Slug of the project (falls back to the current project set via `trustattic use`)")
 	return cmd
 }
 
@@ -163,8 +166,10 @@ func NewConnectionPutCommand() *cobra.Command {
 	var project string
 	var name string
 	cmd := &cobra.Command{
-		Use:  "update <connection_id>",
-		Args: cobra.ExactArgs(1),
+		Use:   "update <connection_id>",
+		Short: "Update a provider provider",
+		Long:  "Update a provider provider\n\nNote: the following fields cannot be set via CLI flags and are always omitted from the request: access_data.",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -185,7 +190,7 @@ func NewConnectionPutCommand() *cobra.Command {
 				return fmt.Errorf("invalid <connection_id>: %w", err)
 			}
 			resp, err := apiClient.ConnectionPutWithResponse(
-				context.Background(),
+				cmd.Context(),
 				project,
 				connectionIDParsed,
 				&client.ConnectionPutParams{},
@@ -208,7 +213,7 @@ func NewConnectionPutCommand() *cobra.Command {
 			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")
+	cmd.Flags().StringVar(&project, "project", "", "Slug of the project (falls back to the current project set via `trustattic use`)")
 	cmd.Flags().StringVar(&name, "name", "", "name")
 	return cmd
 }
@@ -217,8 +222,9 @@ func NewConnectionCheckCommand() *cobra.Command {
 	var project string
 	var connectionID string
 	cmd := &cobra.Command{
-		Use:  "check",
-		Args: cobra.NoArgs,
+		Use:   "check",
+		Short: "Healthcheck for the provider to a provider",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -239,7 +245,7 @@ func NewConnectionCheckCommand() *cobra.Command {
 				return fmt.Errorf("invalid --connection-id: %w", err)
 			}
 			resp, err := apiClient.ConnectionCheckWithResponse(
-				context.Background(),
+				cmd.Context(),
 				project,
 				connectionIDParsed,
 				&client.ConnectionCheckParams{},
@@ -259,8 +265,8 @@ func NewConnectionCheckCommand() *cobra.Command {
 			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")
-	cmd.Flags().StringVar(&connectionID, "connection-id", "", "connection-id")
+	cmd.Flags().StringVar(&project, "project", "", "Slug of the project (falls back to the current project set via `trustattic use`)")
+	cmd.Flags().StringVar(&connectionID, "connection-id", "", "ID of the connection (required)")
 	_ = cmd.MarkFlagRequired("connection-id")
 	return cmd
 }
@@ -268,8 +274,9 @@ func NewConnectionCheckCommand() *cobra.Command {
 func NewResourceGetCommand() *cobra.Command {
 	var project string
 	cmd := &cobra.Command{
-		Use:  "resource",
-		Args: cobra.NoArgs,
+		Use:   "resource",
+		Short: "List of resources",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -286,7 +293,7 @@ func NewResourceGetCommand() *cobra.Command {
 				return err
 			}
 			resp, err := apiClient.ResourceGetWithResponse(
-				context.Background(),
+				cmd.Context(),
 				project,
 				&client.ResourceGetParams{},
 			)
@@ -305,6 +312,6 @@ func NewResourceGetCommand() *cobra.Command {
 			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")
+	cmd.Flags().StringVar(&project, "project", "", "Slug of the project (falls back to the current project set via `trustattic use`)")
 	return cmd
 }

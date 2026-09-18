@@ -2,7 +2,6 @@
 package generated
 
 import (
-	"context"
 	"fmt"
 	"os"
 	gotime "time"
@@ -18,8 +17,9 @@ import (
 func NewScheduleGetCommand() *cobra.Command {
 	var project string
 	cmd := &cobra.Command{
-		Use:  "list",
-		Args: cobra.NoArgs,
+		Use:   "list",
+		Short: "List of schedules",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -36,7 +36,7 @@ func NewScheduleGetCommand() *cobra.Command {
 				return err
 			}
 			resp, err := apiClient.ScheduleGetWithResponse(
-				context.Background(),
+				cmd.Context(),
 				project,
 				&client.ScheduleGetParams{},
 			)
@@ -55,7 +55,7 @@ func NewScheduleGetCommand() *cobra.Command {
 			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")
+	cmd.Flags().StringVar(&project, "project", "", "Slug of the project (falls back to the current project set via `trustattic use`)")
 	return cmd
 }
 
@@ -64,24 +64,26 @@ func NewSchedulePostCommand() *cobra.Command {
 	var cronExpression string
 	var name string
 	cmd := &cobra.Command{
-		Use:  "create",
-		Args: cobra.NoArgs,
+		Use:   "create",
+		Short: "Create a new schedule",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("this command is not yet supported: request body field(s) \"selector\" (type \"oneOf/unknown\"), \"settings\" (type \"object\") cannot be set via CLI flags")
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")
-	cmd.Flags().StringVar(&cronExpression, "cron-expression", "", "cron-expression")
+	cmd.Flags().StringVar(&project, "project", "", "Slug of the project (falls back to the current project set via `trustattic use`)")
+	cmd.Flags().StringVar(&cronExpression, "cron-expression", "", "cron expression in UTC (required)")
 	_ = cmd.MarkFlagRequired("cron-expression")
-	cmd.Flags().StringVar(&name, "name", "", "name")
+	cmd.Flags().StringVar(&name, "name", "", "Name of the schedule, if not defined, then will be generated")
 	return cmd
 }
 
 func NewScheduleDeleteCommand() *cobra.Command {
 	var project string
 	cmd := &cobra.Command{
-		Use:  "delete <schedule_id>",
-		Args: cobra.ExactArgs(1),
+		Use:   "delete <schedule_id>",
+		Short: "Delete the schedule",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -102,7 +104,7 @@ func NewScheduleDeleteCommand() *cobra.Command {
 				return fmt.Errorf("invalid <schedule_id>: %w", err)
 			}
 			resp, err := apiClient.ScheduleDeleteWithResponse(
-				context.Background(),
+				cmd.Context(),
 				project,
 				scheduleIDParsed,
 				&client.ScheduleDeleteParams{},
@@ -122,7 +124,7 @@ func NewScheduleDeleteCommand() *cobra.Command {
 			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")
+	cmd.Flags().StringVar(&project, "project", "", "Slug of the project (falls back to the current project set via `trustattic use`)")
 	return cmd
 }
 
@@ -131,16 +133,17 @@ func NewSchedulePutCommand() *cobra.Command {
 	var cronExpression string
 	var name string
 	cmd := &cobra.Command{
-		Use:  "update <schedule_id>",
-		Args: cobra.ExactArgs(1),
+		Use:   "update <schedule_id>",
+		Short: "Update the schedule",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("this command is not yet supported: request body field(s) \"selector\" (type \"oneOf/unknown\"), \"settings\" (type \"object\") cannot be set via CLI flags")
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")
-	cmd.Flags().StringVar(&cronExpression, "cron-expression", "", "cron-expression")
+	cmd.Flags().StringVar(&project, "project", "", "Slug of the project (falls back to the current project set via `trustattic use`)")
+	cmd.Flags().StringVar(&cronExpression, "cron-expression", "", "cron expression in UTC (required)")
 	_ = cmd.MarkFlagRequired("cron-expression")
-	cmd.Flags().StringVar(&name, "name", "", "name")
+	cmd.Flags().StringVar(&name, "name", "", "Name of the schedule, if not defined, then will be generated")
 	return cmd
 }
 
@@ -148,8 +151,9 @@ func NewScheduleGetHistoryCommand() *cobra.Command {
 	var project string
 	var scheduleID string
 	cmd := &cobra.Command{
-		Use:  "history",
-		Args: cobra.NoArgs,
+		Use:   "history",
+		Short: "List of runs of schedules",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -170,7 +174,7 @@ func NewScheduleGetHistoryCommand() *cobra.Command {
 				return fmt.Errorf("invalid --schedule-id: %w", err)
 			}
 			resp, err := apiClient.ScheduleGetHistoryWithResponse(
-				context.Background(),
+				cmd.Context(),
 				project,
 				scheduleIDParsed,
 				&client.ScheduleGetHistoryParams{},
@@ -190,8 +194,8 @@ func NewScheduleGetHistoryCommand() *cobra.Command {
 			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")
-	cmd.Flags().StringVar(&scheduleID, "schedule-id", "", "schedule-id")
+	cmd.Flags().StringVar(&project, "project", "", "Slug of the project (falls back to the current project set via `trustattic use`)")
+	cmd.Flags().StringVar(&scheduleID, "schedule-id", "", "ID of the schedule (required)")
 	_ = cmd.MarkFlagRequired("schedule-id")
 	return cmd
 }
@@ -201,8 +205,9 @@ func NewScheduleRunPostCommand() *cobra.Command {
 	var scheduleID string
 	var time string
 	cmd := &cobra.Command{
-		Use:  "run",
-		Args: cobra.NoArgs,
+		Use:   "run",
+		Short: "Run the backup out of the schedule",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -231,7 +236,7 @@ func NewScheduleRunPostCommand() *cobra.Command {
 				timeParsed = &parsed
 			}
 			resp, err := apiClient.ScheduleRunPostWithResponse(
-				context.Background(),
+				cmd.Context(),
 				project,
 				scheduleIDParsed,
 				&client.ScheduleRunPostParams{},
@@ -254,8 +259,8 @@ func NewScheduleRunPostCommand() *cobra.Command {
 			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")
-	cmd.Flags().StringVar(&scheduleID, "schedule-id", "", "schedule-id")
+	cmd.Flags().StringVar(&project, "project", "", "Slug of the project (falls back to the current project set via `trustattic use`)")
+	cmd.Flags().StringVar(&scheduleID, "schedule-id", "", "ID of the schedule (required)")
 	_ = cmd.MarkFlagRequired("schedule-id")
 	cmd.Flags().StringVar(&time, "time", "", "time")
 	return cmd

@@ -2,7 +2,6 @@
 package generated
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -15,8 +14,9 @@ import (
 
 func NewProjectGetCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:  "list",
-		Args: cobra.NoArgs,
+		Use:   "list",
+		Short: "Get all project that are available for the authorized account",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -27,7 +27,7 @@ func NewProjectGetCommand() *cobra.Command {
 				return err
 			}
 			resp, err := apiClient.ProjectGetWithResponse(
-				context.Background(),
+				cmd.Context(),
 				&client.ProjectGetParams{},
 			)
 			if err != nil {
@@ -52,8 +52,9 @@ func NewProjectPostCommand() *cobra.Command {
 	var logoUrl string
 	var name string
 	cmd := &cobra.Command{
-		Use:  "create",
-		Args: cobra.NoArgs,
+		Use:   "create",
+		Short: "Create a new project",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -64,7 +65,7 @@ func NewProjectPostCommand() *cobra.Command {
 				return err
 			}
 			resp, err := apiClient.ProjectPostWithResponse(
-				context.Background(),
+				cmd.Context(),
 				&client.ProjectPostParams{},
 				client.ProjectPostJSONRequestBody{
 					LogoUrl: &logoUrl,
@@ -93,8 +94,9 @@ func NewProjectPostCommand() *cobra.Command {
 
 func NewProjectSlugGetCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:  "get <project_slug>",
-		Args: cobra.ExactArgs(1),
+		Use:   "get <project_slug>",
+		Short: "Get a project by its slug",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -105,7 +107,7 @@ func NewProjectSlugGetCommand() *cobra.Command {
 				return err
 			}
 			resp, err := apiClient.ProjectSlugGetWithResponse(
-				context.Background(),
+				cmd.Context(),
 				args[0],
 				&client.ProjectSlugGetParams{},
 			)
@@ -131,8 +133,9 @@ func NewProjectPutCommand() *cobra.Command {
 	var logoUrl string
 	var name string
 	cmd := &cobra.Command{
-		Use:  "update <project_slug>",
-		Args: cobra.ExactArgs(1),
+		Use:   "update <project_slug>",
+		Short: "Update an project",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -143,7 +146,7 @@ func NewProjectPutCommand() *cobra.Command {
 				return err
 			}
 			resp, err := apiClient.ProjectPutWithResponse(
-				context.Background(),
+				cmd.Context(),
 				args[0],
 				&client.ProjectPutParams{},
 				client.ProjectPutJSONRequestBody{
@@ -174,8 +177,9 @@ func NewProjectPutCommand() *cobra.Command {
 func NewProjectAccountsGetCommand() *cobra.Command {
 	var project string
 	cmd := &cobra.Command{
-		Use:  "accounts",
-		Args: cobra.NoArgs,
+		Use:   "accounts",
+		Short: "Get all accounts that have access to the project",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -192,7 +196,7 @@ func NewProjectAccountsGetCommand() *cobra.Command {
 				return err
 			}
 			resp, err := apiClient.ProjectAccountsGetWithResponse(
-				context.Background(),
+				cmd.Context(),
 				project,
 				&client.ProjectAccountsGetParams{},
 			)
@@ -211,7 +215,7 @@ func NewProjectAccountsGetCommand() *cobra.Command {
 			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")
+	cmd.Flags().StringVar(&project, "project", "", "Slug of the project (falls back to the current project set via `trustattic use`)")
 	return cmd
 }
 
@@ -219,14 +223,15 @@ func NewProjectInvitePutCommand() *cobra.Command {
 	var project string
 	var email string
 	cmd := &cobra.Command{
-		Use:  "invite",
-		Args: cobra.NoArgs,
+		Use:   "invite",
+		Short: "Invite a user to a project",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("this command is not yet supported: request body field(s) \"permissions\" (type \"array\") cannot be set via CLI flags")
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")
-	cmd.Flags().StringVar(&email, "email", "", "email")
+	cmd.Flags().StringVar(&project, "project", "", "Slug of the project (falls back to the current project set via `trustattic use`)")
+	cmd.Flags().StringVar(&email, "email", "", "email (required)")
 	_ = cmd.MarkFlagRequired("email")
 	return cmd
 }
@@ -234,8 +239,9 @@ func NewProjectInvitePutCommand() *cobra.Command {
 func NewProjectPermissionsGetCommand() *cobra.Command {
 	var project string
 	cmd := &cobra.Command{
-		Use:  "permissions",
-		Args: cobra.NoArgs,
+		Use:   "permissions",
+		Short: "Get all permissions that are available for the authorized account",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := cli.LoadConfig()
 			if err != nil {
@@ -252,7 +258,7 @@ func NewProjectPermissionsGetCommand() *cobra.Command {
 				return err
 			}
 			resp, err := apiClient.ProjectPermissionsGetWithResponse(
-				context.Background(),
+				cmd.Context(),
 				project,
 				&client.ProjectPermissionsGetParams{},
 			)
@@ -271,6 +277,6 @@ func NewProjectPermissionsGetCommand() *cobra.Command {
 			return cli.Render(cmd.OutOrStdout(), mode, isTTY, resp.Body)
 		},
 	}
-	cmd.Flags().StringVar(&project, "project", "", "project (falls back to the current project set via `trustattic use`)")
+	cmd.Flags().StringVar(&project, "project", "", "Slug of the project (falls back to the current project set via `trustattic use`)")
 	return cmd
 }

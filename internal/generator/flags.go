@@ -117,21 +117,42 @@ func isFlatScalar(openAPIType string) bool {
 
 // FlagDef is one Cobra flag or positional argument, template-ready.
 type FlagDef struct {
-	Name     string // CLI flag name, kebab-case
-	GoIdent  string // Go variable name
+	Name    string // CLI flag name, kebab-case
+	GoIdent string // Go variable name
+	// Help is the flag's usage string: the spec's description for the
+	// underlying path parameter or body property, falling back to the flag
+	// name when the spec declares none.
+	Help     string
 	Kind     BodyFlagKind
 	Value    ValueKind // how to convert the raw scalar into the real request type
 	Required bool
 	Optional bool // true only for the project flag
 }
 
-// UnsupportedBodyProp is a required request-body property that isFlatScalar
-// filtered out of BodyFlags - it has no flat CLI representation (an
-// object/array/oneOf shape), but unlike an optional property in the same
-// situation, silently omitting it from the request body would send an
-// incomplete request the server can reject (or worse, silently accept with
-// the field missing/zero-valued). GeneratedCommand carries these so the
-// generated command can fail fast with a clear error instead.
+// helpFor returns the usage text for a flag: the spec-supplied description
+// when there is one, else the flag name itself (which is at least no worse
+// than the placeholder text the generator emitted before descriptions were
+// captured).
+func helpFor(description, flagName string) string {
+	if strings.TrimSpace(description) != "" {
+		return description
+	}
+	return flagName
+}
+
+// UnsupportedBodyProp is a request-body property that isFlatScalar filtered
+// out of BodyFlags - it has no flat CLI representation (an object/array/
+// oneOf shape). GeneratedCommand carries two lists of these, split by
+// whether the property is required:
+//
+//   - required (UnsupportedRequiredBodyProps): silently omitting it would
+//     send an incomplete request the server can reject (or worse, silently
+//     accept with the field missing/zero-valued), so the generated command
+//     fails fast with a clear error instead of running at all.
+//   - optional (DroppedOptionalBodyProps): the request is still valid
+//     without it, so the command runs - but the field can never be set from
+//     the CLI, which is worth saying out loud in --help rather than leaving
+//     as an invisible gap.
 type UnsupportedBodyProp struct {
 	Name string
 	Type string // OpenAPI schema type; "" for a oneOf/anyOf union with no direct type
@@ -152,6 +173,15 @@ type GeneratedCommand struct {
 	// a command's RunE as an immediate, descriptive error instead of a real
 	// (silently incomplete) request.
 	UnsupportedRequiredBodyProps []UnsupportedBodyProp
+
+	// DroppedOptionalBodyProps lists every *optional* body property this
+	// command's operation declares that isFlatScalar excluded from
+	// BodyFlags. These don't block the command - the request is valid
+	// without them - but they can never be supplied from the CLI, so
+	// emit.go names them in the command's Long help instead of leaving the
+	// omission invisible (see the design spec's "no nested-object escape
+	// hatch" decision).
+	DroppedOptionalBodyProps []UnsupportedBodyProp
 }
 
 // BuildGeneratedCommands resolves every CommandSpec's path parameters and
@@ -163,7 +193,13 @@ func BuildGeneratedCommands(specs []CommandSpec) []GeneratedCommand {
 
 		if s.Positional != nil {
 			name := FlagName(s.Positional.Name)
-			gc.PositionalFlag = &FlagDef{Name: name, GoIdent: GoIdent(name), Kind: KindString, Value: valueKindFor(s.Positional.Format)}
+			gc.PositionalFlag = &FlagDef{
+				Name:    name,
+				GoIdent: GoIdent(name),
+				Help:    helpFor(s.Positional.Description, name),
+				Kind:    KindString,
+				Value:   valueKindFor(s.Positional.Format),
+			}
 		}
 
 		for _, p := range s.Flags {
@@ -171,6 +207,7 @@ func BuildGeneratedCommands(specs []CommandSpec) []GeneratedCommand {
 			gc.Flags = append(gc.Flags, FlagDef{
 				Name:     name,
 				GoIdent:  GoIdent(name),
+				Help:     helpFor(p.Description, name),
 				Kind:     KindString,
 				Value:    valueKindFor(p.Format),
 				Required: !IsProjectFlag(p),
@@ -181,15 +218,17 @@ func BuildGeneratedCommands(specs []CommandSpec) []GeneratedCommand {
 		for _, bp := range s.Operation.BodyProps {
 			if !isFlatScalar(bp.Type) {
 				// No flat CLI representation for an object/array/union body
-				// property - it's simply not exposed as a flag. If it's
-				// required, that's not a property we can just drop quietly:
-				// record it so emit.go can make the command fail fast
-				// instead of silently sending an incomplete request.
+				// property - it's simply not exposed as a flag. Record it
+				// either way so the omission is never silent: a *required*
+				// one makes emit.go fail the command fast instead of
+				// sending an incomplete request, and an *optional* one is
+				// named in the command's Long help so users can see the
+				// field exists but isn't settable here.
+				prop := UnsupportedBodyProp{Name: bp.Name, Type: bp.Type}
 				if bp.Required {
-					gc.UnsupportedRequiredBodyProps = append(gc.UnsupportedRequiredBodyProps, UnsupportedBodyProp{
-						Name: bp.Name,
-						Type: bp.Type,
-					})
+					gc.UnsupportedRequiredBodyProps = append(gc.UnsupportedRequiredBodyProps, prop)
+				} else {
+					gc.DroppedOptionalBodyProps = append(gc.DroppedOptionalBodyProps, prop)
 				}
 				continue
 			}
@@ -197,6 +236,7 @@ func BuildGeneratedCommands(specs []CommandSpec) []GeneratedCommand {
 			gc.BodyFlags = append(gc.BodyFlags, FlagDef{
 				Name:     name,
 				GoIdent:  GoIdent(name),
+				Help:     helpFor(bp.Description, name),
 				Kind:     FlagKindForType(bp.Type),
 				Value:    valueKindFor(bp.Format),
 				Required: bp.Required,

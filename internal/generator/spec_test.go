@@ -136,3 +136,73 @@ func TestLoadOperations_HasParams_TrueWhenOperationDeclaresAny(t *testing.T) {
 	require.True(t, byID["GadgetPut"].HasParams, "GadgetPut declares a path parameter")
 	require.False(t, byID["GadgetPost"].HasParams, "GadgetPost declares no parameters at all")
 }
+
+// helpByID loads testdata/help.yaml - a dedicated fixture for summary /
+// description capture and for path-parameter ordering, kept separate from
+// the other two fixtures so it doesn't disturb their exact operation counts
+// or emitted-text assertions - and indexes it by OperationID.
+func helpByID(t *testing.T) map[string]generator.Operation {
+	t.Helper()
+	ops, err := generator.LoadOperations("testdata/help.yaml")
+	require.NoError(t, err)
+	byID := map[string]generator.Operation{}
+	for _, op := range ops {
+		byID[op.OperationID] = op
+	}
+	return byID
+}
+
+func TestLoadOperations_CapturesOperationSummary(t *testing.T) {
+	byID := helpByID(t)
+
+	require.Equal(t, "Get one part of a doodad", byID["DoodadPartGet"].Summary)
+	require.Equal(t, "Create a new doodad", byID["DoodadPost"].Summary)
+}
+
+func TestLoadOperations_RealPlatformSpec_EveryOperationHasASummary(t *testing.T) {
+	ops, err := generator.LoadOperations("../../spec/api.yaml")
+	require.NoError(t, err)
+	for _, op := range ops {
+		require.NotEmptyf(t, op.Summary, "operation %s has no summary", op.OperationID)
+	}
+}
+
+func TestLoadOperations_CapturesPathParamDescription(t *testing.T) {
+	byID := helpByID(t)
+
+	byName := map[string]generator.Param{}
+	for _, p := range byID["DoodadPartGet"].Params {
+		byName[p.Name] = p
+	}
+	require.Equal(t, "ID of the doodad", byName["doodad_id"].Description)
+	require.Equal(t, "ID of the part", byName["part_id"].Description)
+}
+
+func TestLoadOperations_CapturesBodyPropDescription(t *testing.T) {
+	byID := helpByID(t)
+
+	byName := map[string]generator.BodyProp{}
+	for _, p := range byID["DoodadPost"].BodyProps {
+		byName[p.Name] = p
+	}
+	require.Equal(t, "Human-readable doodad label", byName["label"].Description)
+	// A property the spec gives no description at all stays empty here;
+	// the flag-name fallback happens in flags.go, not the loader.
+	require.Empty(t, byName["nickname"].Description)
+}
+
+// TestLoadOperations_SortsPathParamsByURLOrderNotDeclarationOrder covers the
+// ordering guarantee both naming.go and emit.go depend on. help.yaml's
+// DoodadPartGet declares part_id before doodad_id, while its URL is
+// /doodad/{doodad_id}/part/{part_id} - if the loader passed declaration
+// order straight through, emit.go would hand the two UUIDs to the client
+// method in swapped positions and silently mis-route every request, while
+// still compiling cleanly.
+func TestLoadOperations_SortsPathParamsByURLOrderNotDeclarationOrder(t *testing.T) {
+	byID := helpByID(t)
+
+	got := byID["DoodadPartGet"].Params
+	require.Len(t, got, 2)
+	require.Equal(t, "doodad_id", got[0].Name, "doodad_id occurs first in the URL template")
+	require.Equal(t, "part_id", got[1].Name, "part_id occurs second in the URL template")
+}

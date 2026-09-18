@@ -161,9 +161,66 @@ func TestBuildGeneratedCommands_OptionalNonFlatBodyProp_ExcludedButNotUnsupporte
 	got := generator.BuildGeneratedCommands(specs)
 
 	require.Empty(t, got[0].BodyFlags)
-	// Optional non-flat properties are simply dropped, not treated as a
-	// reason to refuse to run - only a *required* one is.
+	// An optional non-flat property isn't a reason to refuse to run - only
+	// a *required* one is ...
 	require.Empty(t, got[0].UnsupportedRequiredBodyProps)
+	// ... but dropping it must not be silent either: it's recorded so
+	// emit.go can name it in the command's Long help.
+	require.Len(t, got[0].DroppedOptionalBodyProps, 1)
+	require.Equal(t, "settings", got[0].DroppedOptionalBodyProps[0].Name)
+	require.Equal(t, "object", got[0].DroppedOptionalBodyProps[0].Type)
+}
+
+func TestBuildGeneratedCommands_FlagHelpComesFromSpecDescription(t *testing.T) {
+	positional := generator.Param{Name: "part_id", Description: "ID of the part"}
+	specs := []generator.CommandSpec{
+		{
+			Tag:        "doodad",
+			Verb:       "part",
+			Positional: &positional,
+			Flags: []generator.Param{
+				{Name: "doodad_id", Description: "ID of the doodad"},
+				{Name: "project_slug", Description: "Slug of the project"},
+			},
+			Operation: generator.Operation{
+				HasBody: true,
+				BodyProps: []generator.BodyProp{
+					{Name: "label", Type: "string", Description: "Human-readable doodad label", Required: true},
+				},
+			},
+		},
+	}
+	got := generator.BuildGeneratedCommands(specs)
+
+	require.Equal(t, "ID of the part", got[0].PositionalFlag.Help)
+
+	byName := map[string]generator.FlagDef{}
+	for _, f := range got[0].Flags {
+		byName[f.Name] = f
+	}
+	require.Equal(t, "ID of the doodad", byName["doodad-id"].Help)
+	require.Equal(t, "Slug of the project", byName["project"].Help)
+
+	require.Len(t, got[0].BodyFlags, 1)
+	require.Equal(t, "Human-readable doodad label", got[0].BodyFlags[0].Help)
+}
+
+func TestBuildGeneratedCommands_FlagHelpFallsBackToFlagNameWhenSpecHasNoDescription(t *testing.T) {
+	specs := []generator.CommandSpec{
+		{
+			Tag:   "doodad",
+			Verb:  "create",
+			Flags: []generator.Param{{Name: "doodad_id"}},
+			Operation: generator.Operation{
+				HasBody:   true,
+				BodyProps: []generator.BodyProp{{Name: "nickname", Type: "string"}},
+			},
+		},
+	}
+	got := generator.BuildGeneratedCommands(specs)
+
+	require.Equal(t, "doodad-id", got[0].Flags[0].Help)
+	require.Equal(t, "nickname", got[0].BodyFlags[0].Help)
 }
 
 func TestBuildGeneratedCommands_BodyPropsBecomeTypedFlags(t *testing.T) {
