@@ -1,0 +1,89 @@
+version: 2
+
+project_name: trustattic
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: trustattic
+    main: ./cmd/trustattic
+    binary: trustattic
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - id: trustattic
+    ids:
+      - trustattic
+    name_template: "trustattic_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+brews:
+  - name: trustattic-cli
+    repository:
+      owner: trustattic
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/trustattic/trustattic-cli"
+    description: "Command-line client for the TrustAttic Platform API"
+    license: "MIT"
+    install: |
+      bin.install "trustattic"
+    test: |
+      system "#{bin}/trustattic --version"
+
+winget:
+  - name: trustattic-cli
+    publisher: TrustAttic
+    package_identifier: TrustAttic.CLI
+    short_description: "Command-line client for the TrustAttic Platform API"
+    license: MIT
+    homepage: "https://github.com/trustattic/trustattic-cli"
+    repository:
+      owner: microsoft
+      name: winget-pkgs
+      branch: "trustattic-cli-{{ .Version }}"
+      token: "{{ .Env.WINGET_GITHUB_TOKEN }}"
+      pull_request:
+        enabled: true
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
+
+release:
+  github:
+    owner: trustattic
+    name: trustattic-cli
