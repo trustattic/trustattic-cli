@@ -11,7 +11,9 @@ function Get-ArchName {
     param([string]$ProcessorArch)
     switch ($ProcessorArch) {
         "AMD64" { return "amd64" }
-        "ARM64" { return "arm64" }
+        # .goreleaser.yaml's build matrix excludes windows/arm64, so there is no
+        # asset to download — report it as unsupported rather than 404ing later.
+        "ARM64" { return "unsupported" }
         default { return "unsupported" }
     }
 }
@@ -73,8 +75,18 @@ function Install-Trustattic {
         Write-Host "Installed trustattic to $installDir\trustattic.exe"
 
         $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-        if ($userPath -notlike "*$installDir*") {
-            [Environment]::SetEnvironmentVariable("Path", "$userPath;$installDir", "User")
+        # Literal, delimiter-aware membership test: -like/-notlike would treat
+        # $installDir as a wildcard pattern (e.g. [ ] ? * in a username).
+        $pathEntries = $userPath -split ';'
+        if ($pathEntries -notcontains $installDir) {
+            # A user with no user-scoped PATH yet gets $null here; concatenating
+            # blindly would leave a leading ';' in the new value.
+            if ([string]::IsNullOrEmpty($userPath)) {
+                $newPath = $installDir
+            } else {
+                $newPath = "$userPath;$installDir"
+            }
+            [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
             Write-Host "Added $installDir to your user PATH. Restart your terminal for it to take effect."
         }
 

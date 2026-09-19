@@ -686,7 +686,7 @@ if ($MyInvocation.InvocationName -ne '.') {
 
 ```batch
 @echo off
-powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/trustattic/trustattic-cli/main/install.ps1 | iex"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/trustattic/trustattic-cli/master/install.ps1 | iex"
 ```
 
 - [ ] **Step 3: Write the Pester test**

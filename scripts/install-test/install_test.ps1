@@ -12,8 +12,8 @@ Describe "Get-ArchName" {
     It "maps AMD64 to amd64" {
         Get-ArchName -ProcessorArch "AMD64" | Should -Be "amd64"
     }
-    It "maps ARM64 to arm64" {
-        Get-ArchName -ProcessorArch "ARM64" | Should -Be "arm64"
+    It "maps ARM64 to unsupported (not in the build matrix)" {
+        Get-ArchName -ProcessorArch "ARM64" | Should -Be "unsupported"
     }
     It "maps an unknown arch to unsupported" {
         Get-ArchName -ProcessorArch "IA64" | Should -Be "unsupported"
