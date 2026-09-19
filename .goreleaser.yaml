@@ -64,6 +64,15 @@ brews:
     test: |
       system "#{bin}/trustattic --version"
 
+# `skip_upload: true` is temporary. GoReleaser requires `repository` to be a
+# fork you control (it pushes the manifest branch there as the PR HEAD), with
+# `pull_request.base` naming the real upstream. `repository.owner` below is
+# still `microsoft`, which a normal PAT cannot write to — so publishing would
+# 403 on the first real release. Remove `skip_upload` once BOTH are true:
+#   (a) WINGET_GITHUB_TOKEN belongs to an account that has forked
+#       microsoft/winget-pkgs, and
+#   (b) `repository.owner` below is changed to that fork's owner (not
+#       `microsoft`; `pull_request.base` stays microsoft/winget-pkgs).
 winget:
   - name: trustattic-cli
     publisher: TrustAttic
@@ -71,6 +80,7 @@ winget:
     short_description: "Command-line client for the TrustAttic Platform API"
     license: MIT
     homepage: "https://github.com/trustattic/trustattic-cli"
+    skip_upload: true
     repository:
       owner: microsoft
       name: winget-pkgs
@@ -87,3 +97,7 @@ release:
   github:
     owner: trustattic
     name: trustattic-cli
+  # Both install scripts resolve releases/latest/download/<name>, which only
+  # ever points at the most recent non-prerelease. Without this, a tag like
+  # v0.2.0-rc1 would become "latest" for every curl|bash user.
+  prerelease: auto
