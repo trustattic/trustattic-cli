@@ -48,14 +48,23 @@ main() {
     trap 'rm -rf "$tmp_dir"' EXIT
 
     echo "Downloading ${asset}..."
-    status="$(curl -fsSL -w '%{http_code}' -o "${tmp_dir}/${asset}" "$url" || echo "000")"
+    # No -f here: with -f curl exits non-zero on an error status *and* still
+    # prints the -w status, so the substitution would capture curl's error text
+    # concatenated with the code. Without it, curl always writes a body, always
+    # exits 0, and -w yields a clean 3-digit status.
+    status="$(curl -sSL -w '%{http_code}' -o "${tmp_dir}/${asset}" "$url")"
     if [ "$status" != "200" ]; then
         echo "error: no release asset found for ${os}/${arch} (HTTP ${status})" >&2
         echo "  tried: ${url}" >&2
         exit 1
     fi
 
-    curl -fsSL -o "${tmp_dir}/checksums.txt" "$checksums_url"
+    status="$(curl -sSL -w '%{http_code}' -o "${tmp_dir}/checksums.txt" "$checksums_url")"
+    if [ "$status" != "200" ]; then
+        echo "error: could not fetch checksums.txt (HTTP ${status})" >&2
+        echo "  tried: ${checksums_url}" >&2
+        exit 1
+    fi
 
     echo "Verifying checksum..."
     expected="$(grep " ${asset}\$" "${tmp_dir}/checksums.txt" | awk '{print $1}')"
@@ -63,7 +72,15 @@ main() {
         echo "error: ${asset} not listed in checksums.txt" >&2
         exit 1
     fi
-    actual="$(sha256sum "${tmp_dir}/${asset}" | awk '{print $1}')"
+    # macOS ships BSD userland, which has `shasum` but no GNU `sha256sum`.
+    if command -v sha256sum >/dev/null 2>&1; then
+        actual="$(sha256sum "${tmp_dir}/${asset}" | awk '{print $1}')"
+    elif command -v shasum >/dev/null 2>&1; then
+        actual="$(shasum -a 256 "${tmp_dir}/${asset}" | awk '{print $1}')"
+    else
+        echo "error: neither sha256sum nor shasum found; cannot verify download" >&2
+        exit 1
+    fi
     if [ "$expected" != "$actual" ]; then
         echo "error: checksum mismatch for ${asset}" >&2
         echo "  expected: ${expected}" >&2
