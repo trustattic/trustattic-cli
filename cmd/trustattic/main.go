@@ -16,6 +16,10 @@ var version = "dev"
 
 func main() {
 	root := cli.NewRootCommand()
+	// Setting root.Version here is effectively a no-op: fang.Execute
+	// overwrites it (see the fang.WithVersion note below), which is what
+	// actually supplies the version. Kept as harmless defensive wiring in case
+	// the command is ever executed without going through fang.
 	root.Version = version
 	commands.Register(root)
 	generated.Register(root)
@@ -27,10 +31,10 @@ func main() {
 	// process outright via Go's default signal disposition instead of
 	// cancelling the in-flight request.
 	//
-	// WithVersion is required too: fang.Execute unconditionally overwrites
-	// root.Version from build info (falling back to "unknown (built from
-	// source)") unless a version is supplied via this option, so setting
-	// root.Version above is not enough on its own.
+	// WithVersion is what actually sets the reported version: fang.Execute
+	// unconditionally overwrites root.Version from build info (falling back to
+	// "unknown (built from source)") unless a version is supplied via this
+	// option, so the root.Version assignment above does nothing on its own.
 	if err := fang.Execute(
 		context.Background(),
 		root,
