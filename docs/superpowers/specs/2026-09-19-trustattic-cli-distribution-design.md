@@ -144,13 +144,21 @@ Each does the same four things for its platform:
 
 1. **Detect OS/arch** — `uname -s`/`uname -m` (mapped to GoReleaser's
    `linux`/`darwin`, `amd64`/`arm64` naming) for the shell script;
-   `$env:PROCESSOR_ARCHITECTURE`/`.NET` runtime info for PowerShell.
-2. **Resolve the latest release** — `GET
-   https://api.github.com/repos/trustattic/trustattic-cli/releases/latest`,
-   extract the matching archive's and `checksums.txt`'s download URLs.
-   Errors clearly (naming the OS/arch) if no matching asset exists — this
-   guards against a future OS/arch being dropped from the build matrix
-   without anyone noticing.
+   `$env:PROCESSOR_ARCHITECTURE`/`.NET` runtime info for PowerShell — and
+   construct the exact archive filename GoReleaser's naming template
+   produces for that OS/arch (e.g. `trustattic_darwin_arm64.tar.gz`). This
+   is a pure, offline computation — no network call needed to know the name.
+2. **Resolve the download URL** — GitHub serves a stable, documented
+   redirect for the most recent non-prerelease release's named assets:
+   `https://github.com/trustattic/trustattic-cli/releases/latest/download/<asset>`.
+   The script builds this URL directly from the filename computed in step 1
+   (and identically for `checksums.txt`) — no GitHub API call, no JSON
+   parsing, no extra dependency (`jq` or otherwise), and no exposure to the
+   unauthenticated API's 60-requests/hour rate limit. A `curl`/`Invoke-
+   WebRequest` that follows the redirect and gets a 404 means the
+   OS/arch combination isn't in the release — the script checks the HTTP
+   status explicitly and errors clearly (naming the OS/arch) rather than
+   saving a 404 error page as if it were the binary.
 3. **Download and verify** — fetch the archive and `checksums.txt` into a
    temp directory, verify the archive's checksum, abort with a clear error
    on mismatch (never install an unverified binary).
@@ -184,10 +192,12 @@ Each does the same four things for its platform:
   and how regressions in the config get caught in CI on every PR (a
   snapshot-mode run added to a lint/build workflow, separate from the
   tag-triggered release workflow).
-- The install scripts get a local dry-run test harness: mock the GitHub
-  releases API response (a fixture JSON file) and verify OS/arch detection
-  and URL selection logic without hitting the network or actually
-  installing anything.
+- The install scripts' OS/arch-detection and filename-construction logic is
+  a pure function of `uname -s`/`uname -m` (or their Windows equivalents)
+  with no network dependency, so it's directly unit-testable: call it with
+  each supported and unsupported OS/arch combination and assert on the
+  resulting filename (or the "unsupported" error), without mocking anything
+  or touching the network.
 - End-to-end verification of `brew install`, `winget install`, and the
   install scripts running for real can't happen from this development
   environment (no macOS/Windows, and winget review runs on Microsoft's
