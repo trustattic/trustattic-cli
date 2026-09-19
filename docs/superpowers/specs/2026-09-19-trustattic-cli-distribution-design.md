@@ -13,7 +13,7 @@ by pushing a semver git tag.
 
 - `brew install trustattic/tap/trustattic-cli` works on macOS (Intel and
   Apple Silicon).
-- `winget install <publisher>.TrustatticCli` works on Windows.
+- `winget install TrustAttic.CLI` works on Windows.
 - `curl -fsSL https://raw.githubusercontent.com/trustattic/trustattic-cli/master/install.sh | bash`
   works on macOS/Linux; PowerShell (`irm ... | iex`) and CMD equivalents work
   on Windows.
