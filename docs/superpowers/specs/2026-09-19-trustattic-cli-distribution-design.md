@@ -14,7 +14,7 @@ by pushing a semver git tag.
 - `brew install trustattic/tap/trustattic-cli` works on macOS (Intel and
   Apple Silicon).
 - `winget install <publisher>.TrustatticCli` works on Windows.
-- `curl -fsSL https://raw.githubusercontent.com/trustattic/trustattic-cli/main/install.sh | bash`
+- `curl -fsSL https://raw.githubusercontent.com/trustattic/trustattic-cli/master/install.sh | bash`
   works on macOS/Linux; PowerShell (`irm ... | iex`) and CMD equivalents work
   on Windows.
 - Cutting a release is a single action (`git tag vX.Y.Z && git push --tags`)
@@ -87,15 +87,15 @@ only for one to exist when it's run. It's fetched straight from
 `raw.githubusercontent.com` (no custom domain, no GitHub Pages setup needed):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/trustattic/trustattic-cli/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/trustattic/trustattic-cli/master/install.sh | bash
 ```
 
 ```powershell
-irm https://raw.githubusercontent.com/trustattic/trustattic-cli/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/trustattic/trustattic-cli/master/install.ps1 | iex
 ```
 
 ```batch
-curl -fsSL https://raw.githubusercontent.com/trustattic/trustattic-cli/main/install.cmd -o install.cmd && install.cmd && del install.cmd
+curl -fsSL https://raw.githubusercontent.com/trustattic/trustattic-cli/master/install.cmd -o install.cmd && install.cmd && del install.cmd
 ```
 
 ## Components
@@ -112,7 +112,7 @@ Declares:
 - `builds:` — the `cmd/trustattic` entrypoint, the five OS/arch targets,
   `CGO_ENABLED=0`, version info injected via `-ldflags` (so `trustattic
   --version` reports the release tag).
-- `archives:` — naming convention (`trustattic_<version>_<os>_<arch>`),
+- `archives:` — naming convention (`trustattic_<os>_<arch>` (version-free, required for the `releases/latest/download/<name>` install approach below)),
   `.tar.gz` for Unix / `.zip` for Windows, README/LICENSE included in each
   archive.
 - `checksums:` — a single `checksums.txt` per release.
