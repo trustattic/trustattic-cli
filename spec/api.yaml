@@ -901,25 +901,25 @@ components:
                 - $ref: '#/components/schemas/ScheduleSelectorResourceId'
         ScheduleSelectorResourceId:
             properties:
-                resource_id:
+                resource_ids:
                     items:
                         format: uuid
                         type: string
                     minLength: 1
                     type: array
             required:
-                - resource_id
+                - resource_ids
             type: object
         ScheduleSelectorTag:
             properties:
-                tag:
+                tags:
                     description: '"key:value" pairs (e.g. "env:production"). A bare key with no ":value" matches any resource carrying that key, regardless of value. Multiple entries must all match (AND).'
                     items:
                         type: string
                     minLength: 1
                     type: array
             required:
-                - tag
+                - tags
             type: object
         ScheduleSettings:
             properties:

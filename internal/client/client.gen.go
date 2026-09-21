@@ -408,13 +408,13 @@ type ScheduleSelector struct {
 
 // ScheduleSelectorResourceId defines model for ScheduleSelectorResourceId.
 type ScheduleSelectorResourceId struct {
-	ResourceId []openapi_types.UUID `json:"resource_id"`
+	ResourceIds []openapi_types.UUID `json:"resource_ids"`
 }
 
 // ScheduleSelectorTag defines model for ScheduleSelectorTag.
 type ScheduleSelectorTag struct {
-	// Tag "key:value" pairs (e.g. "env:production"). A bare key with no ":value" matches any resource carrying that key, regardless of value. Multiple entries must all match (AND).
-	Tag []string `json:"tag"`
+	// Tags "key:value" pairs (e.g. "env:production"). A bare key with no ":value" matches any resource carrying that key, regardless of value. Multiple entries must all match (AND).
+	Tags []string `json:"tags"`
 }
 
 // ScheduleSettings defines model for ScheduleSettings.
